@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildQuery } from './apiHelpers'
+import { buildQuery, parseTrials, formatTitle, nearestLocation } from './apiHelpers'
 
 const BASE = 'https://clinicaltrials.gov/api/v2/studies'
 
@@ -88,5 +88,97 @@ describe('buildQuery', () => {
   it('omits filter.overallStatus when status is "ALL"', () => {
     const url = buildQuery({ condition: 'cancer', status: 'ALL' }, null, null)
     expect(url).not.toContain('filter.overallStatus')
+  })
+})
+
+const mockStudy = {
+  protocolSection: {
+    identificationModule: { nctId: 'NCT001', briefTitle: 'A STUDY OF DRUG X IN ADULTS' },
+    statusModule: { overallStatus: 'RECRUITING' },
+    descriptionModule: { briefSummary: 'Tests drug X.' },
+    designModule: { phases: ['PHASE2'] },
+    eligibilityModule: { minimumAge: '18 Years', maximumAge: 'N/A', sex: 'ALL' },
+    armsInterventionsModule: { interventions: [{ type: 'DRUG', name: 'Drug X' }] },
+    contactsLocationsModule: {
+      centralContacts: [{ phone: '555-1234', email: 'a@b.com' }],
+      locations: [
+        { facility: 'Site A', city: 'Boston', state: 'Massachusetts', country: 'United States', geoPoint: { lat: 42.36, lon: -71.06 } },
+        { facility: 'Site B', city: 'New York', state: 'New York', country: 'United States', geoPoint: { lat: 40.71, lon: -74.01 } },
+      ],
+    },
+  },
+}
+
+describe('parseTrials', () => {
+  it('maps nctId, status, phases, summary', () => {
+    const [trial] = parseTrials([mockStudy])
+    expect(trial.nctId).toBe('NCT001')
+    expect(trial.status).toBe('RECRUITING')
+    expect(trial.phases).toEqual(['PHASE2'])
+    expect(trial.summary).toBe('Tests drug X.')
+  })
+
+  it('maps contact phone and email', () => {
+    const [trial] = parseTrials([mockStudy])
+    expect(trial.contact.phone).toBe('555-1234')
+    expect(trial.contact.email).toBe('a@b.com')
+  })
+
+  it('maps locations array', () => {
+    const [trial] = parseTrials([mockStudy])
+    expect(trial.locations).toHaveLength(2)
+    expect(trial.locations[0].facility).toBe('Site A')
+  })
+
+  it('returns empty array for empty input', () => {
+    expect(parseTrials([])).toEqual([])
+  })
+
+  it('handles missing optional modules gracefully', () => {
+    const minimal = {
+      protocolSection: {
+        identificationModule: { nctId: 'NCT002', briefTitle: 'Minimal' },
+        statusModule: { overallStatus: 'COMPLETED' },
+      },
+    }
+    const [trial] = parseTrials([minimal])
+    expect(trial.nctId).toBe('NCT002')
+    expect(trial.phases).toEqual([])
+    expect(trial.locations).toEqual([])
+    expect(trial.contact).toEqual({})
+  })
+})
+
+describe('formatTitle', () => {
+  it('lowercases all-caps words except acronyms', () => {
+    expect(formatTitle('A STUDY OF DRUG X IN ADULTS WITH CANCER')).toBe(
+      'A Study of Drug X in Adults With Cancer'
+    )
+  })
+
+  it('returns original if already reasonable', () => {
+    expect(formatTitle('Pembrolizumab in Breast Cancer')).toBe('Pembrolizumab in Breast Cancer')
+  })
+})
+
+describe('nearestLocation', () => {
+  const locations = [
+    { facility: 'Boston Site', city: 'Boston', state: 'Massachusetts', geoPoint: { lat: 42.36, lon: -71.06 } },
+    { facility: 'NY Site', city: 'New York', state: 'New York', geoPoint: { lat: 40.71, lon: -74.01 } },
+  ]
+
+  it('returns closest location and distance in miles', () => {
+    // User is in New York
+    const result = nearestLocation(locations, { lat: 40.748, lng: -73.996 })
+    expect(result.facility).toBe('NY Site')
+    expect(result.distanceMi).toBeCloseTo(3, 0)
+  })
+
+  it('returns null when no locations', () => {
+    expect(nearestLocation([], { lat: 40.748, lng: -73.996 })).toBeNull()
+  })
+
+  it('returns null when coords null', () => {
+    expect(nearestLocation(locations, null)).toBeNull()
   })
 })
