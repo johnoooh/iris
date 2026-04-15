@@ -71,4 +71,22 @@ describe('buildQuery', () => {
     const url = buildQuery({ condition: 'cancer', sort: 'LastUpdatePostDate:desc' }, null, null)
     expect(url).toContain('sort=LastUpdatePostDate%3Adesc')
   })
+
+  it('throws when condition is missing', () => {
+    expect(() => buildQuery({}, null, null)).toThrow('buildQuery: params.condition is required')
+  })
+
+  it('omits filter.geo when radius is "anywhere"', () => {
+    const url = buildQuery(
+      { condition: 'cancer', radius: 'anywhere' },
+      { lat: 40.748, lng: -73.996 },
+      null
+    )
+    expect(url).not.toContain('filter.geo')
+  })
+
+  it('omits filter.overallStatus when status is "ALL"', () => {
+    const url = buildQuery({ condition: 'cancer', status: 'ALL' }, null, null)
+    expect(url).not.toContain('filter.overallStatus')
+  })
 })

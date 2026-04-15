@@ -1,6 +1,10 @@
 const CT_BASE = 'https://clinicaltrials.gov/api/v2/studies'
 
 export function buildQuery(params, coords, pageToken) {
+  if (!params.condition) {
+    throw new Error('buildQuery: params.condition is required')
+  }
+
   const p = new URLSearchParams()
 
   p.set('query.cond', params.condition)
@@ -24,7 +28,7 @@ export function buildQuery(params, coords, pageToken) {
     p.set('filter.sex', params.sex)
   }
 
-  if (params.age) {
+  if (params.age != null) {
     p.set('filter.age', String(params.age))
   }
 
