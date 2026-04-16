@@ -19,16 +19,7 @@ export function useNLP() {
 
   function initWorker() {
     if (workerRef.current) return
-    const workerUrl = new URL('../workers/nlp.worker.js', import.meta.url)
-    const workerOpts = { type: 'module' }
-    let worker
-    try {
-      worker = new Worker(workerUrl, workerOpts)
-    } catch {
-      // Fallback for test environments where Worker is stubbed as an arrow function
-      // (arrow functions cannot be called with `new` in Vitest 4.x)
-      worker = Worker(workerUrl, workerOpts)
-    }
+    const worker = new Worker(new URL('../workers/nlp.worker.js', import.meta.url), { type: 'module' })
     workerRef.current = worker
 
     worker.onmessage = (event) => {
@@ -70,14 +61,17 @@ export function useNLP() {
     }
   }
 
-  function load() {
+  const load = useCallback(() => {
     if (!webGPUSupported) return
+    setError(null)
     initWorker()
     setStatus('downloading')
     workerRef.current.postMessage({ type: 'load' })
-  }
+  }, [webGPUSupported])
 
   const extract = useCallback((text) => {
+    if (!workerRef.current) return Promise.reject(new Error('Worker not initialized. Call load() first.'))
+    if (pendingRef.current) return Promise.reject(new Error('Extraction already in progress'))
     return new Promise((resolve) => {
       setStatus('extracting')
       pendingRef.current = { resolve }

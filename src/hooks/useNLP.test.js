@@ -14,7 +14,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockWorker.onmessage = null
   mockWorker.onerror = null
-  vi.stubGlobal('Worker', vi.fn(() => mockWorker))
+  vi.stubGlobal('Worker', vi.fn(function () { return mockWorker }))
 })
 
 afterEach(() => {
@@ -142,5 +142,36 @@ describe('useNLP — cleanup', () => {
     act(() => result.current.load())
     unmount()
     expect(mockWorker.terminate).toHaveBeenCalled()
+  })
+})
+
+describe('useNLP — extract() guards', () => {
+  beforeEach(() => {
+    vi.stubGlobal('navigator', { gpu: {} })
+  })
+
+  it('rejects if extract() called before load()', async () => {
+    const { result } = renderHook(() => useNLP())
+    await expect(result.current.extract('test')).rejects.toThrow('Worker not initialized')
+  })
+
+  it('rejects concurrent extract() calls', async () => {
+    const { result } = renderHook(() => useNLP())
+    act(() => result.current.load())
+    act(() => mockWorker.onmessage({ data: { type: 'ready' } }))
+
+    act(() => { result.current.extract('first call') })
+    await expect(result.current.extract('second call')).rejects.toThrow('Extraction already in progress')
+  })
+})
+
+describe('useNLP — onerror handler', () => {
+  it('sets error status when worker fires onerror', () => {
+    vi.stubGlobal('navigator', { gpu: {} })
+    const { result } = renderHook(() => useNLP())
+    act(() => result.current.load())
+    act(() => mockWorker.onerror({ message: 'worker crash' }))
+    expect(result.current.status).toBe('error')
+    expect(result.current.error).toBe('worker crash')
   })
 })
