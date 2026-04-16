@@ -25,16 +25,21 @@ export default function SearchForm({ onSearch, prefill }) {
     if (prefill.condition) { setCondition(prefill.condition); keys.add('condition') }
     if (prefill.location) { setLocation(prefill.location); keys.add('location') }
     if (prefill.age != null) { setAge(String(prefill.age)); keys.add('age') }
-    if (prefill.sex) { setSex(prefill.sex); keys.add('sex') }
-    if (prefill.status) { setStatus(prefill.status); keys.add('status') }
+    if (prefill.sex != null && prefill.sex !== '') { setSex(prefill.sex); keys.add('sex') }
+    if (prefill.status != null && prefill.status !== '') { setStatus(prefill.status); keys.add('status') }
     if (prefill.phases?.length) { setPhases(prefill.phases); keys.add('phases') }
     setPrefillKeys(keys)
   }, [prefill])
+
+  function clearPrefill(key) {
+    setPrefillKeys(k => { const n = new Set(k); n.delete(key); return n })
+  }
 
   function togglePhase(value) {
     setPhases(prev =>
       prev.includes(value) ? prev.filter(p => p !== value) : [...prev, value]
     )
+    clearPrefill('phases')
   }
 
   function handleSubmit(e) {
@@ -73,7 +78,7 @@ export default function SearchForm({ onSearch, prefill }) {
             type="text"
             required
             value={condition}
-            onChange={e => { setCondition(e.target.value); setPrefillKeys(k => { const n = new Set(k); n.delete('condition'); return n }) }}
+            onChange={e => { setCondition(e.target.value); clearPrefill('condition') }}
             placeholder="e.g. breast cancer"
             className={inputClass('condition')}
           />
@@ -87,7 +92,7 @@ export default function SearchForm({ onSearch, prefill }) {
             id="location"
             type="text"
             value={location}
-            onChange={e => { setLocation(e.target.value); setPrefillKeys(k => { const n = new Set(k); n.delete('location'); return n }) }}
+            onChange={e => { setLocation(e.target.value); clearPrefill('location') }}
             placeholder="City, state, or zip"
             className={inputClass('location')}
           />
@@ -124,7 +129,7 @@ export default function SearchForm({ onSearch, prefill }) {
             min={0}
             max={120}
             value={age}
-            onChange={e => { setAge(e.target.value); setPrefillKeys(k => { const n = new Set(k); n.delete('age'); return n }) }}
+            onChange={e => { setAge(e.target.value); clearPrefill('age') }}
             placeholder="e.g. 52"
             className={inputClass('age')}
           />
@@ -137,8 +142,8 @@ export default function SearchForm({ onSearch, prefill }) {
           <select
             id="sex"
             value={sex}
-            onChange={e => setSex(e.target.value)}
-            className="w-full border border-parchment-400 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-parchment-800"
+            onChange={e => { setSex(e.target.value); clearPrefill('sex') }}
+            className={inputClass('sex')}
           >
             <option value="ALL">Any</option>
             <option value="MALE">Male</option>
@@ -153,8 +158,8 @@ export default function SearchForm({ onSearch, prefill }) {
           <select
             id="status"
             value={status}
-            onChange={e => setStatus(e.target.value)}
-            className="w-full border border-parchment-400 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-parchment-800"
+            onChange={e => { setStatus(e.target.value); clearPrefill('status') }}
+            className={inputClass('status')}
           >
             <option value="RECRUITING">Recruiting</option>
             <option value="NOT_YET_RECRUITING">Not yet recruiting</option>

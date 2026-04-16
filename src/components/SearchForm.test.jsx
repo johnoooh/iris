@@ -74,4 +74,14 @@ describe('SearchForm prefill', () => {
     rerender(<SearchForm onSearch={vi.fn()} prefill={{ condition: 'diabetes' }} />)
     expect(screen.getByLabelText(/condition/i)).toHaveValue('diabetes')
   })
+
+  it('removes highlight class when user edits a prefilled condition field', async () => {
+    const user = userEvent.setup()
+    render(<SearchForm onSearch={vi.fn()} prefill={{ condition: 'cancer' }} />)
+    const input = screen.getByLabelText(/condition/i)
+    expect(input.className).toMatch(/bg-parchment-100/)
+    await user.clear(input)
+    await user.type(input, 'diabetes')
+    expect(input.className).not.toMatch(/bg-parchment-100/)
+  })
 })
