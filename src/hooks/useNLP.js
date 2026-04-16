@@ -63,6 +63,9 @@ export function useNLP() {
 
   const load = useCallback(() => {
     if (!webGPUSupported) return
+    // Terminate any existing worker before starting/retrying
+    workerRef.current?.terminate()
+    workerRef.current = null
     setError(null)
     initWorker()
     setStatus('downloading')
