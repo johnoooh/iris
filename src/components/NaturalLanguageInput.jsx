@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNLP } from '../hooks/useNLP'
 
 const STORAGE_KEY = 'iris_nlp_enabled'
@@ -13,12 +13,17 @@ export default function NaturalLanguageInput({ onExtract }) {
 
   const { status, progress, error, webGPUSupported, load, extract } = useNLP()
 
+  const hasAutoLoaded = useRef(false)
+
   // Auto-load model on expand if user previously consented
   useEffect(() => {
-    if (consented && expanded && status === 'idle' && webGPUSupported) {
+    if (!expanded) { hasAutoLoaded.current = false; return }
+    if (hasAutoLoaded.current) return
+    if (consented && status === 'idle' && webGPUSupported) {
+      hasAutoLoaded.current = true
       load()
     }
-  }, [expanded]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [expanded, consented, status, webGPUSupported, load])
 
   function handleConsent() {
     try { localStorage.setItem(STORAGE_KEY, 'true') } catch { /* private browsing */ }
@@ -31,7 +36,7 @@ export default function NaturalLanguageInput({ onExtract }) {
     if (!text.trim()) return
     const fields = await extract(text.trim())
     setExtracted(fields)
-    if (fields) onExtract(fields)
+    if (fields && typeof onExtract === 'function') onExtract(fields)
   }
 
   function getProgressLabel() {
@@ -52,14 +57,15 @@ export default function NaturalLanguageInput({ onExtract }) {
         className="flex items-center gap-2 text-sm text-parchment-800 hover:text-parchment-950"
         onClick={() => setExpanded(e => !e)}
         aria-expanded={expanded}
+        aria-controls="nlp-panel"
       >
-        <span>{expanded ? '▼' : '▶'}</span>
+        <span aria-hidden="true">{expanded ? '▼' : '▶'}</span>
         <span>Or, describe your situation in your own words</span>
         <span className={`text-xs px-2 py-0.5 rounded-full ml-1 ${badgeClass}`}>{badgeLabel}</span>
       </button>
 
       {expanded && (
-        <div className="mt-3 max-w-xl">
+        <div id="nlp-panel" className="mt-3 max-w-xl">
           {/* WebGPU unavailable */}
           {!webGPUSupported && (
             <div className="bg-parchment-50 border border-parchment-300 rounded-md p-3">
@@ -106,7 +112,13 @@ export default function NaturalLanguageInput({ onExtract }) {
           {webGPUSupported && consented && status === 'downloading' && (
             <div>
               <p className="text-sm text-parchment-800 italic mb-2">{getProgressLabel()}</p>
-              <div className="bg-parchment-300 rounded-full h-1.5 overflow-hidden">
+              <div
+                className="bg-parchment-300 rounded-full h-1.5 overflow-hidden"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round((progress?.progress ?? 0) * 100)}
+              >
                 <div
                   className="bg-parchment-800 h-1.5 rounded-full transition-all"
                   style={{ width: `${Math.round((progress?.progress ?? 0) * 100)}%` }}

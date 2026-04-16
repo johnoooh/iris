@@ -8,6 +8,7 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test/setup.js',
+    // Node 25 ships experimental localStorage that conflicts with jsdom's implementation
     execArgv: ['--no-experimental-webstorage'],
   },
 })
