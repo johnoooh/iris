@@ -7,7 +7,7 @@
 
 ## Overview
 
-Phase 2 enables patients to describe their situation in plain English instead of filling out the structured search form. A local AI model (Gemma 3 1B via WebLLM) runs entirely in the browser, extracts structured search fields from the free text, and pre-fills the form. No text leaves the user's device.
+Phase 2 enables patients to describe their situation in plain English instead of filling out the structured search form. A local AI model (Gemma 2 2B via WebLLM) runs entirely in the browser, extracts structured search fields from the free text, and pre-fills the form. No text leaves the user's device.
 
 The existing `NaturalLanguageInput` stub (currently disabled with a "Coming soon" badge) is fully implemented in this phase.
 
@@ -30,7 +30,7 @@ Panel header shows "Or, describe your situation in your own words" with a "New" 
 ### State 2 — Consent screen (first time only)
 On first expand, show a one-time consent screen:
 - Explains the model runs locally (never sent to a server)
-- States the download size (~700 MB) and browser requirements
+- States the download size (~1.3 GB) and browser requirements
 - "Download & enable" button starts the download
 - "Not now" dismisses back to collapsed
 
@@ -81,7 +81,7 @@ Detected on component mount via `navigator.gpu`. Panel is expanded but the texta
 - Detects WebGPU support and exposes `webGPUSupported` boolean
 
 **`src/utils/nlpHelpers.js`**
-- `buildPrompt(text)` — constructs the extraction prompt for Gemma 3 1B
+- `buildPrompt(text)` — constructs the extraction prompt for Gemma 2 2B
 - `parseExtraction(raw)` — strips prose, parses JSON, validates field types, fills safe defaults
 - Safe defaults: `sex: 'ALL'`, `status: 'RECRUITING'`, `phases: []`
 - `condition` has no default — left null if missing (triggers warning in UI)
@@ -108,7 +108,7 @@ Detected on component mount via `navigator.gpu`. Panel is expanded but the texta
 
 ## Prompt Design
 
-Prompt sent to Gemma 3 1B (in `nlpHelpers.js`):
+Prompt sent to Gemma 2 2B (in `nlpHelpers.js`):
 
 ```
 Extract clinical trial search fields from the patient description below.
@@ -141,9 +141,9 @@ Patient description: "{{text}}"
 
 | Property | Value |
 |---|---|
-| Model | Gemma 3 1B (instruction-tuned) |
+| Model | Gemma 2 2B (instruction-tuned) |
 | Provider | `@mlc-ai/web-llm` |
-| Download size | ~700 MB (cached in browser after first load) |
+| Download size | ~1.3 GB (cached in browser after first load) |
 | Inference time | ~1–2 seconds on modern hardware |
 | Runtime | WebGPU (Chrome 113+, Edge 113+, Safari 17.4+) |
 

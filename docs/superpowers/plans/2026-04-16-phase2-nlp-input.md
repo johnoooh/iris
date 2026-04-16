@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the disabled `NaturalLanguageInput` stub with a fully working local-AI feature that extracts structured search fields from free-text patient descriptions using Gemma 3 1B via WebLLM, running entirely in the browser.
+**Goal:** Replace the disabled `NaturalLanguageInput` stub with a fully working local-AI feature that extracts structured search fields from free-text patient descriptions using Gemma 2 2B via WebLLM, running entirely in the browser.
 
 **Architecture:** A Web Worker owns the `MLCEngine` singleton and handles all WebLLM communication. A `useNLP` hook manages the worker lifecycle and exposes a simple state machine (`idle → downloading → ready → extracting → ready`). `NaturalLanguageInput` drives the 5-state UI and fires `onExtract(fields)` after the user confirms the parsed result. `SearchForm` gains a `prefill` prop that syncs extracted fields into its internal state.
 
@@ -45,11 +45,11 @@ node -e "require('@mlc-ai/web-llm'); console.log('ok')"
 ```
 Expected: `ok`
 
-> **Note on model ID:** WebLLM model IDs follow the pattern `{name}-{quant}-MLC`. Before Task 3, verify the exact Gemma 3 1B ID by running:
+> **Note on model ID:** WebLLM model IDs follow the pattern `{name}-{quant}-MLC`. Before Task 3, verify the exact Gemma 2 2B ID by running:
 > ```bash
 > node -e "const w = require('@mlc-ai/web-llm'); console.log(Object.keys(w.prebuiltAppConfig.model_list).filter(k => k.includes('gemma')))"
 > ```
-> The model ID used throughout this plan is `gemma-3-1b-it-q4f32_1-MLC` — update it in `nlp.worker.js` if the actual ID differs.
+> The model ID used throughout this plan is `gemma-2-2b-it-q4f32_1-MLC` — update it in `nlp.worker.js` if the actual ID differs.
 
 - [ ] **Step 3: Commit**
 
@@ -264,7 +264,7 @@ self.onmessage = async (event) => {
     try {
       const { CreateMLCEngine } = await import('@mlc-ai/web-llm')
       // Update the model ID below if the verified ID from Task 1 differs.
-      engine = await CreateMLCEngine('gemma-3-1b-it-q4f32_1-MLC', {
+      engine = await CreateMLCEngine('gemma-2-2b-it-q4f32_1-MLC', {
         initProgressCallback: (progress) => {
           self.postMessage({ type: 'progress', progress })
         },
@@ -1106,11 +1106,11 @@ export default function NaturalLanguageInput({ onExtract }) {
                 One-time setup: download AI model
               </h4>
               <p className="text-sm text-parchment-800 mb-2">
-                This feature uses a small AI model (Gemma 3 1B) that runs entirely in your browser.
+                This feature uses a small AI model (Gemma 2 2B) that runs entirely in your browser.
                 Your words are <strong>never sent to any server</strong>.
               </p>
               <p className="text-xs text-parchment-700 mb-3">
-                ⬇ ~700 MB · Downloads once, cached in your browser · Requires Chrome 113+, Edge
+                ⬇ ~1.3 GB · Downloads once, cached in your browser · Requires Chrome 113+, Edge
                 113+, or Safari 17.4+
               </p>
               <button
