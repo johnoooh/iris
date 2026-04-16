@@ -18,23 +18,25 @@ Rules:
 - "status" and "phases" only if explicitly mentioned (e.g. "Phase 2", "currently recruiting")
 - Return ONLY the JSON object, no explanation
 
-Patient description: "${text}"`
+Patient description: "${text.replace(/"/g, '\\"')}"`
 }
 
 const VALID_SEX = ['MALE', 'FEMALE', 'ALL']
+// 'ALL' is a sentinel meaning "no filter" — see apiHelpers.js buildQuery
 const VALID_STATUS = ['RECRUITING', 'NOT_YET_RECRUITING', 'ALL']
 const VALID_PHASES = ['PHASE1', 'PHASE2', 'PHASE3', 'PHASE4']
 
 export function parseExtraction(raw) {
+  const DEFAULTS = { condition: null, sex: 'ALL', status: 'RECRUITING', phases: [] }
   const start = raw.indexOf('{')
   const end = raw.lastIndexOf('}')
-  if (start === -1 || end === -1) return { condition: null }
+  if (start === -1 || end === -1) return { ...DEFAULTS }
 
   let parsed
   try {
     parsed = JSON.parse(raw.slice(start, end + 1))
   } catch {
-    return { condition: null }
+    return { ...DEFAULTS }
   }
 
   const result = {}
