@@ -2,12 +2,17 @@
 // Dynamically imported so @mlc-ai/web-llm stays out of the main bundle.
 
 // Message protocol:
-//   IN  { type: 'load', modelId, isThinking } — initializes MLCEngine; isThinking suppresses reasoning output
-//   IN  { type: 'extract', text }             — text is a pre-built prompt string (see nlpHelpers.buildPrompt)
-//   OUT { type: 'progress', progress }        — forwarded from initProgressCallback
-//   OUT { type: 'ready' }                     — engine is initialized
-//   OUT { type: 'result', raw }               — raw LLM output string; caller calls parseExtraction on it
-//   OUT { type: 'error', message }            — any load or extraction failure
+//   IN  { type: 'load', modelId, isThinking } — initializes MLCEngine
+//   IN  { type: 'extract', text }              — Phase 2 extraction (one-shot)
+//   IN  { type: 'summarize',  taskId, prompt } — Phase 3 summarize, streaming
+//   IN  { type: 'assess_fit', taskId, prompt } — Phase 3 fit, streaming
+//   OUT { type: 'progress', progress }         — load progress
+//   OUT { type: 'ready' }                      — engine initialized
+//   OUT { type: 'result', raw }                — Phase 2 extract output
+//   OUT { type: 'chunk',     taskId, text }    — streaming token batch
+//   OUT { type: 'task_done', taskId }          — stream finished cleanly
+//   OUT { type: 'task_error', taskId, message }— stream errored
+//   OUT { type: 'error', message }             — load or extract error
 let engine = null
 let loading = false
 let isThinkingModel = false
@@ -15,7 +20,7 @@ let isThinkingModel = false
 const DEFAULT_MODEL_ID = 'gemma-2-2b-it-q4f32_1-MLC'
 
 self.onmessage = async (event) => {
-  const { type, text, modelId, isThinking } = event.data
+  const { type, text, modelId, isThinking, taskId, prompt } = event.data
 
   if (type === 'load') {
     if (engine) { self.postMessage({ type: 'ready' }); return }
@@ -35,6 +40,7 @@ self.onmessage = async (event) => {
       loading = false
       self.postMessage({ type: 'error', message: err?.message ?? String(err) })
     }
+    return
   }
 
   if (type === 'extract') {
@@ -48,12 +54,7 @@ self.onmessage = async (event) => {
         max_tokens: 200,
         temperature: 0.1,
       }
-      // Reasoning models (Qwen3, etc.) emit <think>…</think> before the
-      // answer by default. Pre-fill an empty thinking block so they go
-      // straight to JSON.
-      if (isThinkingModel) {
-        request.extra_body = { enable_thinking: false }
-      }
+      if (isThinkingModel) request.extra_body = { enable_thinking: false }
       const reply = await engine.chat.completions.create(request)
       const raw = reply.choices?.[0]?.message?.content
       if (!raw) {
@@ -64,5 +65,35 @@ self.onmessage = async (event) => {
     } catch (err) {
       self.postMessage({ type: 'error', message: err?.message ?? String(err) })
     }
+    return
+  }
+
+  if (type === 'summarize' || type === 'assess_fit') {
+    if (!engine) {
+      self.postMessage({ type: 'task_error', taskId, message: 'Engine not loaded' })
+      return
+    }
+    try {
+      const request = {
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: type === 'summarize' ? 500 : 250,
+        temperature: 0.2,
+        stream: true,
+      }
+      if (isThinkingModel) request.extra_body = { enable_thinking: false }
+      const stream = await engine.chat.completions.create(request)
+      for await (const chunk of stream) {
+        const delta = chunk.choices?.[0]?.delta?.content
+        if (delta) self.postMessage({ type: 'chunk', taskId, text: delta })
+      }
+      self.postMessage({ type: 'task_done', taskId })
+    } catch (err) {
+      self.postMessage({
+        type: 'task_error',
+        taskId,
+        message: err?.message ?? String(err),
+      })
+    }
+    return
   }
 }
