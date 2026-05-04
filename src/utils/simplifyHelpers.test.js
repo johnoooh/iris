@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildCacheKey, parseSummarizeStream } from './simplifyHelpers'
+import { buildSummarizePrompt, buildAssessFitPrompt } from './simplifyHelpers'
 
 describe('buildCacheKey', () => {
   it('joins nctId, promptType, and modelKey with colons', () => {
@@ -69,5 +70,76 @@ describe('parseSummarizeStream', () => {
     expect(result.summary).toBe('')
     expect(result.eligibility).toBeNull()
     expect(result.complete).toBe(false)
+  })
+})
+
+describe('buildSummarizePrompt', () => {
+  const trial = {
+    summary: 'A Phase 3 study of drug X in patients with condition Y.',
+    eligibility: { criteria: 'Inclusion: adults 18+. Exclusion: pregnancy.' },
+  }
+
+  it('includes the trial briefSummary verbatim', () => {
+    const prompt = buildSummarizePrompt(trial)
+    expect(prompt).toContain('A Phase 3 study of drug X in patients with condition Y.')
+  })
+
+  it('includes the eligibility criteria verbatim', () => {
+    const prompt = buildSummarizePrompt(trial)
+    expect(prompt).toContain('Inclusion: adults 18+. Exclusion: pregnancy.')
+  })
+
+  it('includes the AHRQ exemplar so the model has a one-shot anchor', () => {
+    const prompt = buildSummarizePrompt(trial)
+    expect(prompt).toContain('## What this study is testing')
+    expect(prompt).toContain('## Who can join')
+    expect(prompt).toContain('pembrolizumab') // from the exemplar
+  })
+
+  it('instructs the model on AHRQ-style writing', () => {
+    const prompt = buildSummarizePrompt(trial)
+    expect(prompt).toMatch(/8th-grade|plain language|short sentences/i)
+  })
+})
+
+describe('buildAssessFitPrompt', () => {
+  const trial = {
+    summary: 'A Phase 3 study of drug X.',
+    eligibility: { criteria: 'Adults 18+.' },
+  }
+  const fields = { condition: 'lung cancer', age: 60, sex: 'MALE' }
+
+  it('includes the user description when provided', () => {
+    const prompt = buildAssessFitPrompt(trial, fields, '60yo man with lung cancer in Boston')
+    expect(prompt).toContain('60yo man with lung cancer in Boston')
+  })
+
+  it('includes the extracted condition / age / sex even when no description', () => {
+    const prompt = buildAssessFitPrompt(trial, fields, null)
+    expect(prompt).toContain('lung cancer')
+    expect(prompt).toContain('60')
+    expect(prompt).toContain('MALE')
+  })
+
+  it('says "(none provided)" for description when null', () => {
+    const prompt = buildAssessFitPrompt(trial, fields, null)
+    expect(prompt).toMatch(/none provided/i)
+  })
+
+  it('includes the trial briefSummary and eligibility', () => {
+    const prompt = buildAssessFitPrompt(trial, fields, 'desc')
+    expect(prompt).toContain('A Phase 3 study of drug X.')
+    expect(prompt).toContain('Adults 18+.')
+  })
+
+  it('includes the assess-fit exemplar', () => {
+    const prompt = buildAssessFitPrompt(trial, fields, 'desc')
+    expect(prompt).toContain('Based on what you described') // from the exemplar
+  })
+
+  it('instructs the model to hedge and not give medical advice', () => {
+    const prompt = buildAssessFitPrompt(trial, fields, 'desc')
+    expect(prompt).toMatch(/may|might/i)
+    expect(prompt).toMatch(/not give medical advice|talk with the study doctors/i)
   })
 })
