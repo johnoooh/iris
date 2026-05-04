@@ -86,7 +86,7 @@ export default function ResultCard({ trial, coords, simplification, onRequestSim
             </>
           )}
 
-          {sumState.status === 'streaming' && (
+          {(sumState.status === 'queued' || sumState.status === 'streaming') && (
             <p className="text-xs text-parchment-600 italic mb-2">
               Generating plain-language summary…
             </p>
