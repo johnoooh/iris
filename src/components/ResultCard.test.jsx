@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 import ResultCard from './ResultCard'
 
 const mockTrial = {
@@ -45,5 +45,117 @@ describe('ResultCard', () => {
   it('renders contact phone', () => {
     render(<ResultCard trial={mockTrial} coords={null} />)
     expect(screen.getByText('555-1234')).toBeInTheDocument()
+  })
+})
+
+const trial = {
+  nctId: 'NCT001',
+  title: 'Drug X for Y',
+  status: 'RECRUITING',
+  phases: ['PHASE2'],
+  summary: 'A Phase 2 study of drug X.',
+  eligibility: { criteria: 'Adults 18+.', minAge: '18 Years', sex: 'ALL' },
+  interventions: [],
+  contact: {},
+  locations: [],
+  ctGovUrl: 'https://example.com',
+}
+
+describe('ResultCard — Phase 3 simplification', () => {
+  it('renders only the original prose when no simplification prop is provided', () => {
+    render(<ResultCard trial={trial} coords={null} />)
+    expect(screen.getByText('A Phase 2 study of drug X.')).toBeInTheDocument()
+    expect(screen.queryByText(/What this study is testing/i)).not.toBeInTheDocument()
+  })
+
+  it('renders the on-demand button when simplification is undefined and onRequestSimplify is provided', () => {
+    render(
+      <ResultCard
+        trial={trial}
+        coords={null}
+        simplification={undefined}
+        onRequestSimplify={vi.fn()}
+      />
+    )
+    expect(screen.getByRole('button', { name: /show in plain language/i })).toBeInTheDocument()
+  })
+
+  it('calls onRequestSimplify when the on-demand button is clicked', () => {
+    const onRequestSimplify = vi.fn()
+    render(
+      <ResultCard
+        trial={trial}
+        coords={null}
+        simplification={undefined}
+        onRequestSimplify={onRequestSimplify}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: /show in plain language/i }))
+    expect(onRequestSimplify).toHaveBeenCalledWith(trial)
+  })
+
+  it('renders the streaming summary as it grows', () => {
+    const simplification = {
+      summarize: { status: 'streaming', summary: 'This study tests', eligibility: null, error: null },
+    }
+    render(<ResultCard trial={trial} coords={null} simplification={simplification} />)
+    expect(screen.getByText('This study tests')).toBeInTheDocument()
+    expect(screen.getByText(/Generating plain-language summary/i)).toBeInTheDocument()
+  })
+
+  it('renders both sections when both have streamed', () => {
+    const simplification = {
+      summarize: {
+        status: 'streaming',
+        summary: 'Plain summary.',
+        eligibility: 'Plain eligibility.',
+        error: null,
+      },
+    }
+    render(<ResultCard trial={trial} coords={null} simplification={simplification} />)
+    expect(screen.getByText('Plain summary.')).toBeInTheDocument()
+    expect(screen.getByText('Plain eligibility.')).toBeInTheDocument()
+  })
+
+  it('renders the collapsible "Show clinical summary" with the original prose when complete', () => {
+    const simplification = {
+      summarize: {
+        status: 'complete',
+        summary: 'Plain summary.',
+        eligibility: 'Plain eligibility.',
+        error: null,
+      },
+    }
+    render(<ResultCard trial={trial} coords={null} simplification={simplification} />)
+    expect(screen.getByText(/Show clinical summary/i)).toBeInTheDocument()
+    expect(screen.getByText('A Phase 2 study of drug X.')).toBeInTheDocument()
+  })
+
+  it('falls back to the original prose with hint when summarize errors', () => {
+    const simplification = {
+      summarize: { status: 'error', summary: '', eligibility: null, error: 'engine crashed' },
+    }
+    render(<ResultCard trial={trial} coords={null} simplification={simplification} />)
+    expect(screen.getByText('A Phase 2 study of drug X.')).toBeInTheDocument()
+    expect(screen.getByText(/Plain-language version unavailable/i)).toBeInTheDocument()
+  })
+
+  it('renders the fit paragraph when fit state is complete', () => {
+    const simplification = {
+      summarize: { status: 'complete', summary: 'Sum.', eligibility: 'Elig.', error: null },
+      fit: { status: 'complete', text: 'This may fit you because…', error: null },
+    }
+    render(<ResultCard trial={trial} coords={null} simplification={simplification} />)
+    expect(screen.getByText(/Why this might or might not fit you/i)).toBeInTheDocument()
+    expect(screen.getByText('This may fit you because…')).toBeInTheDocument()
+  })
+
+  it('does not render fit section when fit is in error', () => {
+    const simplification = {
+      summarize: { status: 'complete', summary: 'Sum.', eligibility: 'Elig.', error: null },
+      fit: { status: 'error', text: '', error: 'failed' },
+    }
+    render(<ResultCard trial={trial} coords={null} simplification={simplification} />)
+    expect(screen.queryByText(/Why this might or might not fit you/i)).not.toBeInTheDocument()
   })
 })

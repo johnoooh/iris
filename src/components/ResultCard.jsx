@@ -8,8 +8,15 @@ const STATUS_STYLES = {
   TERMINATED: 'bg-red-100 text-red-700',
 }
 
-export default function ResultCard({ trial, coords }) {
+export default function ResultCard({ trial, coords, simplification, onRequestSimplify }) {
   const nearest = nearestLocation(trial.locations, coords)
+
+  const sumState = simplification?.summarize
+  const fitState = simplification?.fit
+
+  const showPlainLanguage = sumState && sumState.status !== 'error'
+  const showFallbackHint = sumState?.status === 'error'
+  const showFit = fitState && fitState.status !== 'error' && fitState.text
 
   return (
     <article className="bg-white border border-parchment-400 rounded-lg p-5 mb-3 max-w-3xl">
@@ -47,11 +54,88 @@ export default function ResultCard({ trial, coords }) {
         )}
       </div>
 
-      {trial.summary && (
+      {/* PLAIN-LANGUAGE BLOCK — only when simplification is present */}
+      {showPlainLanguage && (
+        <div className="mb-3">
+          <h4 className="text-xs font-bold text-parchment-700 uppercase tracking-wide mb-1">
+            What this study is testing
+          </h4>
+          <p className="text-sm text-parchment-900 leading-relaxed mb-3 whitespace-pre-wrap">
+            {sumState.summary || ' '}
+          </p>
+
+          {sumState.eligibility != null && (
+            <>
+              <h4 className="text-xs font-bold text-parchment-700 uppercase tracking-wide mb-1">
+                Who can join
+              </h4>
+              <p className="text-sm text-parchment-900 leading-relaxed mb-3 whitespace-pre-wrap">
+                {sumState.eligibility || ' '}
+              </p>
+            </>
+          )}
+
+          {showFit && (
+            <>
+              <h4 className="text-xs font-bold text-parchment-700 uppercase tracking-wide mb-1">
+                Why this might or might not fit you
+              </h4>
+              <p className="text-sm text-parchment-900 leading-relaxed mb-3 whitespace-pre-wrap">
+                {fitState.text}
+              </p>
+            </>
+          )}
+
+          {sumState.status === 'streaming' && (
+            <p className="text-xs text-parchment-600 italic mb-2">
+              Generating plain-language summary…
+            </p>
+          )}
+
+          {sumState.status === 'complete' && trial.summary && (
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs text-parchment-700 hover:text-parchment-950">
+                Show clinical summary
+              </summary>
+              <div className="mt-2 pl-3 border-l-2 border-parchment-300">
+                <p className="text-sm text-parchment-900 leading-relaxed mb-2">{trial.summary}</p>
+                {trial.eligibility?.criteria && (
+                  <p className="text-xs text-parchment-800 whitespace-pre-wrap">
+                    <span className="font-medium">Eligibility:</span>{' '}
+                    {trial.eligibility.criteria}
+                  </p>
+                )}
+              </div>
+            </details>
+          )}
+        </div>
+      )}
+
+      {/* ON-DEMAND BUTTON — when no simplification yet and a callback is wired */}
+      {!simplification && onRequestSimplify && (
+        <button
+          type="button"
+          onClick={() => onRequestSimplify(trial)}
+          className="text-xs text-parchment-800 underline hover:text-parchment-950 mb-2"
+        >
+          Show in plain language
+        </button>
+      )}
+
+      {/* ORIGINAL PROSE — shown when no simplification (default Phase 1 path) */}
+      {!showPlainLanguage && trial.summary && (
         <p className="text-sm text-parchment-900 leading-relaxed mb-3">{trial.summary}</p>
       )}
 
-      {(trial.eligibility.minAge || trial.eligibility.sex !== 'ALL') && (
+      {/* FAILURE HINT */}
+      {showFallbackHint && (
+        <p className="text-xs text-parchment-600 italic mb-3">
+          Plain-language version unavailable for this trial.
+        </p>
+      )}
+
+      {/* Existing eligibility-summary line — only when no simplification */}
+      {(trial.eligibility.minAge || trial.eligibility.sex !== 'ALL') && !showPlainLanguage && (
         <p className="text-xs text-parchment-800 mb-3">
           <span className="font-medium">Who can join:</span>{' '}
           {[
