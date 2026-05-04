@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNLP } from '../hooks/useNLP'
+import { NLP_MODELS, resolveModelKey } from '../utils/nlpModels'
 
 const STORAGE_KEY = 'iris_nlp_enabled'
 
@@ -11,6 +12,14 @@ export default function NaturalLanguageInput({ onExtract }) {
     try { return localStorage.getItem(STORAGE_KEY) === 'true' } catch { return false }
   })
 
+  // Model is selected once per page load via ?model=<key> (defaults to gemma).
+  // Resolved at mount so a mid-session URL change doesn't swap models out
+  // from under an in-flight extraction.
+  const [modelKey] = useState(() =>
+    resolveModelKey(typeof window !== 'undefined' ? window.location.search : '')
+  )
+  const model = NLP_MODELS[modelKey]
+
   const { status, progress, error, webGPUSupported, load, extract } = useNLP()
 
   const hasAutoLoaded = useRef(false)
@@ -21,14 +30,14 @@ export default function NaturalLanguageInput({ onExtract }) {
     if (hasAutoLoaded.current) return
     if (consented && status === 'idle' && webGPUSupported) {
       hasAutoLoaded.current = true
-      load()
+      load(model.id, { isThinking: model.isThinking })
     }
-  }, [expanded, consented, status, webGPUSupported, load])
+  }, [expanded, consented, status, webGPUSupported, load, model.id])
 
   function handleConsent() {
     try { localStorage.setItem(STORAGE_KEY, 'true') } catch { /* private browsing */ }
     setConsented(true)
-    load()
+    load(model.id)
   }
 
   async function handleSubmit(e) {
@@ -84,11 +93,11 @@ export default function NaturalLanguageInput({ onExtract }) {
                 One-time setup: download AI model
               </h4>
               <p className="text-sm text-parchment-800 mb-2">
-                This feature uses a small AI model (Gemma 2 2B) that runs entirely in your browser.
+                This feature uses a small AI model ({model.label}) that runs entirely in your browser.
                 Your words are <strong>never sent to any server</strong>.
               </p>
               <p className="text-xs text-parchment-700 mb-3">
-                ⬇ ~1.3 GB · Downloads once, cached in your browser · Requires Chrome 113+, Edge
+                ⬇ {model.sizeLabel} · Downloads once, cached in your browser · Requires Chrome 113+, Edge
                 113+, or Safari 17.4+
               </p>
               <button
@@ -154,6 +163,7 @@ export default function NaturalLanguageInput({ onExtract }) {
               />
               <p className="mt-1 text-xs text-parchment-700">
                 IRIS will extract condition, location, age, and other relevant details automatically.
+                {' '}<span className="text-parchment-500">Model: {model.label}</span>
               </p>
               <button
                 type="submit"

@@ -50,10 +50,24 @@ describe('useNLP — load()', () => {
     expect(result.current.status).toBe('downloading')
   })
 
-  it('posts { type: "load" } to the worker', () => {
+  it('posts a load message with modelId and isThinking to the worker', () => {
     const { result } = renderHook(() => useNLP())
-    act(() => result.current.load())
-    expect(mockWorker.postMessage).toHaveBeenCalledWith({ type: 'load' })
+    act(() => result.current.load('Qwen3-1.7B-q4f32_1-MLC', { isThinking: true }))
+    expect(mockWorker.postMessage).toHaveBeenCalledWith({
+      type: 'load',
+      modelId: 'Qwen3-1.7B-q4f32_1-MLC',
+      isThinking: true,
+    })
+  })
+
+  it('defaults isThinking to false when no options are passed', () => {
+    const { result } = renderHook(() => useNLP())
+    act(() => result.current.load('gemma-2-2b-it-q4f32_1-MLC'))
+    expect(mockWorker.postMessage).toHaveBeenCalledWith({
+      type: 'load',
+      modelId: 'gemma-2-2b-it-q4f32_1-MLC',
+      isThinking: false,
+    })
   })
 
   it('transitions to ready when worker posts ready', () => {

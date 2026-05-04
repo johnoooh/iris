@@ -30,6 +30,19 @@ describe('parseExtraction', () => {
     expect(result.status).toBeUndefined()
   })
 
+  it('strips <think>…</think> blocks before parsing JSON (reasoning models)', () => {
+    const raw = '<think>The patient said breast cancer. I should output {a:1} as a thought.</think>\n{"condition":"breast cancer","age":52}'
+    const result = parseExtraction(raw)
+    expect(result.condition).toBe('breast cancer')
+    expect(result.age).toBe(52)
+  })
+
+  it('strips an unclosed trailing <think> block', () => {
+    const raw = '{"condition":"lung cancer"}\n<think>still reasoning…'
+    const result = parseExtraction(raw)
+    expect(result.condition).toBe('lung cancer')
+  })
+
   it('strips prose before and after the JSON object', () => {
     const raw = 'Sure! Here is the data:\n{"condition":"lung cancer"}\nI hope this helps.'
     const result = parseExtraction(raw)

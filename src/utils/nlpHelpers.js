@@ -29,13 +29,21 @@ export function parseExtraction(raw) {
   // hallucinates NOT_YET_RECRUITING from phrases like "did chemo already".
   // The form's RECRUITING default sticks unless the user changes it manually.
   const DEFAULTS = { condition: null, sex: 'ALL', phases: [] }
-  const start = raw.indexOf('{')
-  const end = raw.lastIndexOf('}')
+
+  // Reasoning models (Qwen3, etc.) may emit <think>…</think> blocks before
+  // the JSON answer. The think block can contain its own braces, which
+  // would mis-slice the JSON. Strip any complete or trailing think blocks.
+  const cleaned = raw
+    .replace(/<think>[\s\S]*?<\/think>/g, '')
+    .replace(/<think>[\s\S]*$/, '')
+
+  const start = cleaned.indexOf('{')
+  const end = cleaned.lastIndexOf('}')
   if (start === -1 || end === -1) return { ...DEFAULTS }
 
   let parsed
   try {
-    parsed = JSON.parse(raw.slice(start, end + 1))
+    parsed = JSON.parse(cleaned.slice(start, end + 1))
   } catch {
     return { ...DEFAULTS }
   }

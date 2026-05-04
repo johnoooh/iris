@@ -61,7 +61,7 @@ export function useNLP() {
     }
   }
 
-  const load = useCallback(() => {
+  const load = useCallback((modelId, options = {}) => {
     if (!webGPUSupported) return
     // Terminate any existing worker before starting/retrying
     workerRef.current?.terminate()
@@ -69,7 +69,11 @@ export function useNLP() {
     setError(null)
     initWorker()
     setStatus('downloading')
-    workerRef.current.postMessage({ type: 'load' })
+    workerRef.current.postMessage({
+      type: 'load',
+      modelId,
+      isThinking: Boolean(options.isThinking),
+    })
   }, [webGPUSupported])
 
   const extract = useCallback((text) => {
