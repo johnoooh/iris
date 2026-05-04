@@ -16,14 +16,18 @@ describe('buildPrompt', () => {
 
 describe('parseExtraction', () => {
   it('parses a complete valid JSON response', () => {
-    const raw = '{"condition":"breast cancer","location":"Brooklyn","age":52,"sex":"FEMALE","status":"RECRUITING","phases":["PHASE2"]}'
+    const raw = '{"condition":"breast cancer","location":"Brooklyn","age":52,"sex":"FEMALE","phases":["PHASE2"]}'
     const result = parseExtraction(raw)
     expect(result.condition).toBe('breast cancer')
     expect(result.location).toBe('Brooklyn')
     expect(result.age).toBe(52)
     expect(result.sex).toBe('FEMALE')
-    expect(result.status).toBe('RECRUITING')
     expect(result.phases).toEqual(['PHASE2'])
+  })
+
+  it('does not include status — recruitment status is not extracted from free text', () => {
+    const result = parseExtraction('{"condition":"cancer","status":"NOT_YET_RECRUITING"}')
+    expect(result.status).toBeUndefined()
   })
 
   it('strips prose before and after the JSON object', () => {
@@ -52,9 +56,9 @@ describe('parseExtraction', () => {
     expect(result.sex).toBe('ALL')
   })
 
-  it('applies safe default status: RECRUITING when status is missing', () => {
+  it('does not set a status default — status is left to the form', () => {
     const result = parseExtraction('{"condition":"cancer"}')
-    expect(result.status).toBe('RECRUITING')
+    expect(result.status).toBeUndefined()
   })
 
   it('applies safe default phases: [] when phases is missing', () => {
