@@ -1,0 +1,16 @@
+{
+  "name": "IRIS — Clinical Trial Finder",
+  "short_name": "IRIS",
+  "description": "Privacy-first clinical trial discovery tool",
+  "start_url": "/iris/",
+  "display": "standalone",
+  "background_color": "#faf7f2",
+  "theme_color": "#7c6f5e",
+  "icons": [
+    {
+      "src": "/iris/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
