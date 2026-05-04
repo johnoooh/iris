@@ -185,4 +185,25 @@ describe('useSimplifier — cancelPending and resetCache', () => {
     }).not.toThrow()
     expect(result.current.states.size).toBe(0)
   })
+
+  it('resumes processing the queue after resetCache + in-flight task_done', () => {
+    const trial2 = { ...trial, nctId: 'NCT002' }
+    const { result } = renderHook(() => useSimplifier(props))
+    // Start trial #1 (it becomes in-flight)
+    act(() => result.current.enqueueSummarize(trial))
+    const firstTaskId = mockWorker.postMessage.mock.calls.find(c => c[0].type === 'summarize')[0].taskId
+
+    // Reset cache while #1 is still in flight
+    act(() => result.current.resetCache())
+
+    // The orphan task_done arrives — it should clear inFlightRef
+    act(() => mockWorker.onmessage({ data: { type: 'task_done', taskId: firstTaskId } }))
+
+    // Now enqueue trial #2 — its summarize should actually be dispatched
+    mockWorker.postMessage.mockClear()
+    act(() => result.current.enqueueSummarize(trial2))
+    const newCalls = mockWorker.postMessage.mock.calls.filter(c => c[0].type === 'summarize')
+    expect(newCalls).toHaveLength(1)
+    expect(newCalls[0][0].prompt).toContain('A Phase 3 study of drug X.')
+  })
 })

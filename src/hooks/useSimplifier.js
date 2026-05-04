@@ -36,9 +36,19 @@ export function useSimplifier({ modelKey, userDescription, extractedFields }) {
 
   function handleWorkerMessage(event) {
     const { type, taskId, text, message } = event.data ?? {}
-    if (!taskId) return // not a Phase 3 message
+    // not a Phase 3 message; the NLP hook owns 'extract' responses
+    if (!taskId) return
     const meta = taskIndexRef.current.get(taskId)
-    if (!meta) return // task was cancelled / cache reset
+    if (!meta) {
+      // The task was cancelled via resetCache, but the worker is still echoing.
+      // For terminal events on the in-flight task, we still need to clear
+      // inFlightRef so the queue can advance — otherwise future enqueues hang.
+      if ((type === 'task_done' || type === 'task_error') && inFlightRef.current?.taskId === taskId) {
+        inFlightRef.current = null
+        maybeStartNext()
+      }
+      return
+    }
 
     if (type === 'chunk') {
       applyChunk(meta, taskId, text ?? '')
@@ -185,6 +195,8 @@ export function useSimplifier({ modelKey, userDescription, extractedFields }) {
     queueRef.current = []
     taskIndexRef.current = new Map()
     statusRef.current = new Map()
+    // inFlightRef is intentionally NOT cleared — its terminal echo is handled
+    // in handleWorkerMessage and will re-enable maybeStartNext() to drain the queue.
     setStates(new Map())
   }, [])
 
