@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useNLP } from './useNLP'
+import { terminateSharedWorker } from '../workers/sharedNlpWorker'
 
 // A reusable mock worker whose onmessage/onerror are set by the hook after creation.
 const mockWorker = {
@@ -11,6 +12,7 @@ const mockWorker = {
 }
 
 beforeEach(() => {
+  terminateSharedWorker()
   vi.clearAllMocks()
   mockWorker.onmessage = null
   mockWorker.onerror = null
@@ -150,12 +152,12 @@ describe('useNLP — extract()', () => {
 })
 
 describe('useNLP — cleanup', () => {
-  it('terminates the worker on unmount', () => {
+  it('does NOT terminate the shared worker on unmount (model is preserved across hook lifetime)', () => {
     vi.stubGlobal('navigator', { gpu: {} })
     const { result, unmount } = renderHook(() => useNLP())
     act(() => result.current.load())
     unmount()
-    expect(mockWorker.terminate).toHaveBeenCalled()
+    expect(mockWorker.terminate).not.toHaveBeenCalled()
   })
 })
 
@@ -164,9 +166,13 @@ describe('useNLP — extract() guards', () => {
     vi.stubGlobal('navigator', { gpu: {} })
   })
 
-  it('rejects if extract() called before load()', async () => {
+  it('lazily creates the shared worker if extract() is called before load()', () => {
     const { result } = renderHook(() => useNLP())
-    await expect(result.current.extract('test')).rejects.toThrow('Worker not initialized')
+    act(() => { result.current.extract('test') })
+    // The shared worker should have been instantiated and received the extract message.
+    const call = mockWorker.postMessage.mock.calls.find(c => c[0].type === 'extract')
+    expect(call).toBeDefined()
+    expect(call[0].text).toContain('test')
   })
 
   it('rejects concurrent extract() calls', async () => {

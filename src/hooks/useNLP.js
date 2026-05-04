@@ -1,75 +1,66 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { buildPrompt, parseExtraction } from '../utils/nlpHelpers'
+import { getSharedWorker, attachListener } from '../workers/sharedNlpWorker'
 
 export function useNLP() {
-  const [status, setStatus] = useState('idle') // idle | downloading | ready | extracting | error
+  const [status, setStatus] = useState('idle')
   const [progress, setProgress] = useState(null)
   const [error, setError] = useState(null)
   const [webGPUSupported] = useState(
     () => typeof navigator !== 'undefined' && 'gpu' in navigator
   )
-  const workerRef = useRef(null)
-  const pendingRef = useRef(null) // { resolve, reject } for the in-flight extract()
+  const pendingRef = useRef(null)
+  const detachRef = useRef(null)
 
   useEffect(() => {
     return () => {
-      workerRef.current?.terminate()
+      detachRef.current?.()
+      // Worker is owned at module scope and may be in use by useSimplifier;
+      // do NOT terminate on unmount. The shared worker preserves the loaded
+      // model across NLP panel toggles.
     }
   }, [])
 
-  function initWorker() {
-    if (workerRef.current) return
-    const worker = new Worker(new URL('../workers/nlp.worker.js', import.meta.url), { type: 'module' })
-    workerRef.current = worker
+  function ensureSubscribed() {
+    if (detachRef.current) return
+    detachRef.current = attachListener(handleMessage)
+  }
 
-    worker.onmessage = (event) => {
-      const { type, progress: p, raw, message } = event.data
+  function handleMessage(event) {
+    const { type, progress: p, raw, message } = event.data ?? {}
+    // Phase 3 messages have a taskId field; ignore them in this hook.
+    if (event.data?.taskId) return
 
-      if (type === 'progress') {
-        setStatus('downloading')
-        setProgress(p)
-      } else if (type === 'ready') {
-        setStatus('ready')
-        setProgress(null)
-      } else if (type === 'result') {
-        setStatus('ready')
-        if (pendingRef.current) {
-          pendingRef.current.resolve(parseExtraction(raw))
-          pendingRef.current = null
-        }
-      } else if (type === 'error') {
-        if (pendingRef.current) {
-          // Error during extraction — return to ready with null result
-          setStatus('ready')
-          pendingRef.current.resolve(null)
-          pendingRef.current = null
-        } else {
-          // Error during load
-          setStatus('error')
-          setError(message)
-        }
-      }
-    }
-
-    worker.onerror = (err) => {
-      setStatus('error')
-      setError(err.message)
+    if (type === 'progress') {
+      setStatus('downloading')
+      setProgress(p)
+    } else if (type === 'ready') {
+      setStatus('ready')
+      setProgress(null)
+    } else if (type === 'result') {
+      setStatus('ready')
       if (pendingRef.current) {
+        pendingRef.current.resolve(parseExtraction(raw))
+        pendingRef.current = null
+      }
+    } else if (type === 'error') {
+      if (pendingRef.current) {
+        setStatus('ready')
         pendingRef.current.resolve(null)
         pendingRef.current = null
+      } else {
+        setStatus('error')
+        setError(message)
       }
     }
   }
 
   const load = useCallback((modelId, options = {}) => {
     if (!webGPUSupported) return
-    // Terminate any existing worker before starting/retrying
-    workerRef.current?.terminate()
-    workerRef.current = null
     setError(null)
-    initWorker()
+    ensureSubscribed()
     setStatus('downloading')
-    workerRef.current.postMessage({
+    getSharedWorker().postMessage({
       type: 'load',
       modelId,
       isThinking: Boolean(options.isThinking),
@@ -77,12 +68,12 @@ export function useNLP() {
   }, [webGPUSupported])
 
   const extract = useCallback((text) => {
-    if (!workerRef.current) return Promise.reject(new Error('Worker not initialized. Call load() first.'))
+    ensureSubscribed()
     if (pendingRef.current) return Promise.reject(new Error('Extraction already in progress'))
     return new Promise((resolve) => {
       setStatus('extracting')
       pendingRef.current = { resolve }
-      workerRef.current.postMessage({ type: 'extract', text: buildPrompt(text) })
+      getSharedWorker().postMessage({ type: 'extract', text: buildPrompt(text) })
     })
   }, [])
 

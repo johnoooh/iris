@@ -4,6 +4,7 @@ import {
   buildAssessFitPrompt,
   parseSummarizeStream,
 } from '../utils/simplifyHelpers'
+import { getSharedWorker, attachListener } from '../workers/sharedNlpWorker'
 
 const initialSummarize = () => ({ status: 'queued', buffer: '', summary: '', eligibility: null, error: null })
 const initialFit = () => ({ status: 'queued', text: '', error: null })
@@ -17,21 +18,13 @@ export function useSimplifier({ modelKey, userDescription, extractedFields }) {
   const inFlightRef = useRef(null)      // { taskId, type, nctId }
   const taskIndexRef = useRef(new Map()) // taskId -> { nctId, type }
   const statusRef = useRef(new Map())   // `${nctId}:${type}` -> 'queued' | 'streaming' | 'complete' | 'error'
-  const workerRef = useRef(null)
+  const detachRef = useRef(null)
 
   const statusKey = (nctId, type) => `${nctId}:${type}`
 
-  function ensureWorker() {
-    if (workerRef.current) return workerRef.current
-    const worker = new Worker(new URL('../workers/nlp.worker.js', import.meta.url), { type: 'module' })
-    workerRef.current = worker
-    worker.onmessage = handleWorkerMessage
-    worker.onerror = (err) => {
-      if (inFlightRef.current) {
-        applyTaskError(inFlightRef.current.taskId, err?.message ?? 'worker crashed')
-      }
-    }
-    return worker
+  function ensureSubscribed() {
+    if (detachRef.current) return
+    detachRef.current = attachListener(handleWorkerMessage)
   }
 
   function handleWorkerMessage(event) {
@@ -137,9 +130,11 @@ export function useSimplifier({ modelKey, userDescription, extractedFields }) {
     if (inFlightRef.current) return
     const next = queueRef.current.shift()
     if (!next) return
+    ensureSubscribed()
     inFlightRef.current = { taskId: next.taskId, type: next.type, nctId: next.nctId }
     taskIndexRef.current.set(next.taskId, { nctId: next.nctId, type: next.type })
-    ensureWorker().postMessage({ type: next.type, taskId: next.taskId, prompt: next.prompt })
+    statusRef.current.set(`${next.nctId}:${next.type}`, 'streaming')
+    getSharedWorker().postMessage({ type: next.type, taskId: next.taskId, prompt: next.prompt })
   }
 
   const enqueueSummarize = useCallback((trial) => {
@@ -201,7 +196,7 @@ export function useSimplifier({ modelKey, userDescription, extractedFields }) {
   }, [])
 
   useEffect(() => {
-    return () => { workerRef.current?.terminate() }
+    return () => { detachRef.current?.() }
   }, [])
 
   return { states, enqueueSummarize, enqueueAssessFit, cancelPending, resetCache }

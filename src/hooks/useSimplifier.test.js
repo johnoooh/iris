@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useSimplifier } from './useSimplifier'
+import { terminateSharedWorker } from '../workers/sharedNlpWorker'
 
 const mockWorker = {
   postMessage: vi.fn(),
@@ -10,6 +11,7 @@ const mockWorker = {
 }
 
 beforeEach(() => {
+  terminateSharedWorker()
   vi.clearAllMocks()
   mockWorker.onmessage = null
   mockWorker.onerror = null
