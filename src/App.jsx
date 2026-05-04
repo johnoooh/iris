@@ -12,6 +12,7 @@ const queryClient = new QueryClient()
 
 function IrisApp() {
   const [searchParams, setSearchParams] = useState(null)
+  const [prefill, setPrefill] = useState(null)
 
   return (
     <div className="min-h-screen bg-parchment-50 flex flex-col">
@@ -19,8 +20,8 @@ function IrisApp() {
       <DedicationBanner />
       <PrivacyStatement />
       <main className="flex-1">
-        <SearchForm onSearch={setSearchParams} />
-        <NaturalLanguageInput />
+        <NaturalLanguageInput onExtract={setPrefill} />
+        <SearchForm onSearch={setSearchParams} prefill={prefill} />
         {searchParams && <ResultsList searchParams={searchParams} />}
       </main>
       <Footer />
