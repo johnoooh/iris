@@ -209,3 +209,25 @@ describe('useSimplifier — cancelPending and resetCache', () => {
     expect(newCalls[0][0].prompt).toContain('A Phase 3 study of drug X.')
   })
 })
+
+describe('useSimplifier — worker error handling', () => {
+  it('clears in-flight task and advances queue when worker fires bus-level onerror', () => {
+    const trial2 = { ...trial, nctId: 'NCT002' }
+    const { result } = renderHook(() => useSimplifier(props))
+    act(() => result.current.enqueueSummarize(trial))
+    act(() => result.current.enqueueSummarize(trial2))
+
+    // First task is now in flight; second is queued.
+    // Simulate a worker crash via the bus (no taskId).
+    act(() => mockWorker.onerror({ message: 'webgpu lost' }))
+
+    // The first trial should be marked as errored.
+    const state1 = result.current.states.get('NCT001')
+    expect(state1.summarize.status).toBe('error')
+    expect(state1.summarize.error).toMatch(/webgpu lost|worker crashed/i)
+
+    // The queue should have advanced — the second trial's summarize should now have been dispatched.
+    const summarizeCalls = mockWorker.postMessage.mock.calls.filter(c => c[0].type === 'summarize')
+    expect(summarizeCalls).toHaveLength(2)
+  })
+})

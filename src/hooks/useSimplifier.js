@@ -29,6 +29,15 @@ export function useSimplifier({ modelKey, userDescription, extractedFields }) {
 
   function handleWorkerMessage(event) {
     const { type, taskId, text, message } = event.data ?? {}
+
+    // Bus-level worker errors arrive without a taskId. If a Phase 3 task is
+    // in flight, treat the error as fatal for that task so the queue can drain.
+    if (type === 'error' && !taskId && inFlightRef.current) {
+      applyTaskError(inFlightRef.current.taskId, message ?? 'worker crashed')
+      maybeStartNext()
+      return
+    }
+
     // not a Phase 3 message; the NLP hook owns 'extract' responses
     if (!taskId) return
     const meta = taskIndexRef.current.get(taskId)
