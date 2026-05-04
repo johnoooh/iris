@@ -1,8 +1,12 @@
+import { useEffect } from 'react'
 import { useGeocode } from '../hooks/useGeocode'
 import { useClinicalTrials } from '../hooks/useClinicalTrials'
+import { useSimplifier } from '../hooks/useSimplifier'
 import ResultCard from './ResultCard'
 
-export default function ResultsList({ searchParams }) {
+const EAGER_BATCH_SIZE = 5
+
+export default function ResultsList({ searchParams, modelKey, userDescription, extractedFields }) {
   const {
     data: coords,
     isError: geoFailed,
@@ -10,9 +14,6 @@ export default function ResultsList({ searchParams }) {
   } = useGeocode(searchParams.location)
 
   const showGeoFallback = searchParams.location && geoFailed
-
-  // Wait for geocoding to settle before firing the trials query so we don't
-  // fire twice (once with null coords, again when coords arrive).
   const geocodeSettled = !searchParams.location || !geoLoading
 
   const {
@@ -23,6 +24,28 @@ export default function ResultsList({ searchParams }) {
     isLoading,
     isError,
   } = useClinicalTrials(searchParams, coords ?? null, !geocodeSettled)
+
+  const simplifier = useSimplifier({
+    modelKey,
+    userDescription,
+    extractedFields,
+  })
+
+  const allTrials = data?.pages.flatMap(p => p.trials) ?? []
+
+  // Eager batch on every search change. resetCache + cancelPending wipe stale
+  // simplifications from the previous query.
+  useEffect(() => {
+    simplifier.cancelPending()
+    simplifier.resetCache()
+    if (allTrials.length === 0) return
+    const eager = allTrials.slice(0, EAGER_BATCH_SIZE)
+    for (const t of eager) simplifier.enqueueSummarize(t)
+    if (extractedFields) {
+      for (const t of eager) simplifier.enqueueAssessFit(t)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   if (isLoading) {
     return (
@@ -50,7 +73,6 @@ export default function ResultsList({ searchParams }) {
     )
   }
 
-  const allTrials = data?.pages.flatMap(p => p.trials) ?? []
   const totalCount = data?.pages[0]?.totalCount ?? 0
 
   if (allTrials.length === 0) {
@@ -68,6 +90,11 @@ export default function ResultsList({ searchParams }) {
     )
   }
 
+  function handleRequestSimplify(trial) {
+    simplifier.enqueueSummarize(trial)
+    if (extractedFields) simplifier.enqueueAssessFit(trial)
+  }
+
   return (
     <section className="px-6 py-6" aria-live="polite" aria-label="Search results">
       {showGeoFallback && (
@@ -83,7 +110,13 @@ export default function ResultsList({ searchParams }) {
       </div>
 
       {allTrials.map(trial => (
-        <ResultCard key={trial.nctId} trial={trial} coords={coords ?? null} />
+        <ResultCard
+          key={trial.nctId}
+          trial={trial}
+          coords={coords ?? null}
+          simplification={simplifier.states.get(trial.nctId)}
+          onRequestSimplify={handleRequestSimplify}
+        />
       ))}
 
       {hasNextPage && (

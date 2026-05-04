@@ -104,7 +104,10 @@ describe('NaturalLanguageInput — ready state', () => {
     fireEvent.click(screen.getByRole('button', { name: /Find trials/i }))
 
     await waitFor(() => expect(onExtract).toHaveBeenCalledWith(
-      expect.objectContaining({ condition: 'breast cancer' })
+      expect.objectContaining({
+        fields: expect.objectContaining({ condition: 'breast cancer' }),
+        description: expect.any(String),
+      })
     ))
   })
 })

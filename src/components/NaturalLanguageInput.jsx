@@ -45,7 +45,9 @@ export default function NaturalLanguageInput({ onExtract }) {
     if (!text.trim()) return
     const fields = await extract(text.trim())
     setExtracted(fields)
-    if (fields && typeof onExtract === 'function') onExtract(fields)
+    if (fields && typeof onExtract === 'function') {
+      onExtract({ fields, description: text.trim() })
+    }
   }
 
   function getProgressLabel() {
