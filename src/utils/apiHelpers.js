@@ -9,9 +9,12 @@ export function buildQuery(params, coords, pageToken) {
 
   p.set('query.cond', params.condition)
   p.set('pageSize', '10')
+  // The v2 API only returns totalCount when this flag is set; otherwise the
+  // field is omitted and the UI shows "0 trials found".
+  p.set('countTotal', 'true')
 
   if (coords && params.radius && params.radius !== 'anywhere') {
-    p.set('filter.geo', `distance(${coords.lat},${coords.lng})mi:${params.radius}`)
+    p.set('filter.geo', `distance(${coords.lat},${coords.lng},${params.radius}mi)`)
   } else if (params.location) {
     p.set('query.locn', params.location)
   }
@@ -20,19 +23,34 @@ export function buildQuery(params, coords, pageToken) {
     p.set('filter.overallStatus', params.status)
   }
 
-  if (params.phases && params.phases.length > 0) {
-    params.phases.forEach(phase => p.append('filter.phase', phase))
-  }
-
+  // Sex and phase use aggFilters (the v2 API has no filter.sex / filter.phase).
+  // Phase values map PHASE1→1, PHASE2→2, etc.; "NA" stays as-is.
+  const aggParts = []
   if (params.sex && params.sex !== 'ALL') {
-    p.set('filter.sex', params.sex)
+    aggParts.push(`sex:${params.sex === 'FEMALE' ? 'f' : 'm'}`)
+  }
+  if (params.phases && params.phases.length > 0) {
+    for (const phase of params.phases) {
+      const num = phase.replace(/^PHASE/, '').toLowerCase()
+      aggParts.push(`phase:${num}`)
+    }
+  }
+  if (aggParts.length > 0) {
+    p.set('aggFilters', aggParts.join(','))
   }
 
+  // Age uses a filter.advanced Essie expression: trial's accepted age range
+  // must include the patient's age.
   if (params.age != null) {
-    p.set('filter.age', String(params.age))
+    p.set(
+      'filter.advanced',
+      `AREA[MinimumAge]RANGE[MIN, ${params.age} years] AND AREA[MaximumAge]RANGE[${params.age} years, MAX]`
+    )
   }
 
-  if (params.sort) {
+  // The v2 API's relevance sort token is "@relevance", not "relevance".
+  // It's also the default, so we only emit non-default sorts.
+  if (params.sort && params.sort !== 'relevance') {
     p.set('sort', params.sort)
   }
 

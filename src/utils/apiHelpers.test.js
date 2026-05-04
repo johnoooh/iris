@@ -15,13 +15,18 @@ describe('buildQuery', () => {
     expect(url).toContain('pageSize=10')
   })
 
+  it('requests countTotal=true so the response includes totalCount', () => {
+    const url = buildQuery({ condition: 'cancer' }, null, null)
+    expect(url).toContain('countTotal=true')
+  })
+
   it('uses filter.geo when coords provided', () => {
     const url = buildQuery(
       { condition: 'cancer', radius: '50' },
       { lat: 40.748, lng: -73.996 },
       null
     )
-    expect(url).toContain('filter.geo=distance%2840.748%2C-73.996%29mi%3A50')
+    expect(url).toContain('filter.geo=distance%2840.748%2C-73.996%2C50mi%29')
   })
 
   it('falls back to query.locn when coords null but location provided', () => {
@@ -41,25 +46,36 @@ describe('buildQuery', () => {
     expect(url).toContain('filter.overallStatus=RECRUITING')
   })
 
-  it('includes filter.phase for selected phases', () => {
+  it('includes phases via aggFilters', () => {
     const url = buildQuery({ condition: 'cancer', phases: ['PHASE2', 'PHASE3'] }, null, null)
-    expect(url).toContain('filter.phase=PHASE2')
-    expect(url).toContain('filter.phase=PHASE3')
+    expect(url).toContain('aggFilters=phase%3A2%2Cphase%3A3')
   })
 
-  it('includes filter.sex when not "ALL"', () => {
+  it('includes sex via aggFilters when not "ALL"', () => {
     const url = buildQuery({ condition: 'cancer', sex: 'FEMALE' }, null, null)
-    expect(url).toContain('filter.sex=FEMALE')
+    expect(url).toContain('aggFilters=sex%3Af')
   })
 
-  it('omits filter.sex when "ALL"', () => {
+  it('combines sex and phases in a single aggFilters value', () => {
+    const url = buildQuery(
+      { condition: 'cancer', sex: 'MALE', phases: ['PHASE1', 'PHASE2'] },
+      null,
+      null
+    )
+    expect(url).toContain('aggFilters=sex%3Am%2Cphase%3A1%2Cphase%3A2')
+  })
+
+  it('omits aggFilters when sex is "ALL" and no phases', () => {
     const url = buildQuery({ condition: 'cancer', sex: 'ALL' }, null, null)
-    expect(url).not.toContain('filter.sex')
+    expect(url).not.toContain('aggFilters')
   })
 
-  it('includes filter.age when age provided', () => {
+  it('includes age via filter.advanced Essie expression', () => {
     const url = buildQuery({ condition: 'cancer', age: 52 }, null, null)
-    expect(url).toContain('filter.age=52')
+    expect(url).toContain('filter.advanced=')
+    expect(url).toContain('MinimumAge')
+    expect(url).toContain('MaximumAge')
+    expect(url).toContain('52+years')
   })
 
   it('includes pageToken when provided', () => {
@@ -67,9 +83,14 @@ describe('buildQuery', () => {
     expect(url).toContain('pageToken=abc123')
   })
 
-  it('includes sort when provided', () => {
+  it('includes sort when an explicit non-relevance value is provided', () => {
     const url = buildQuery({ condition: 'cancer', sort: 'LastUpdatePostDate:desc' }, null, null)
     expect(url).toContain('sort=LastUpdatePostDate%3Adesc')
+  })
+
+  it('omits sort when value is "relevance" (the API default)', () => {
+    const url = buildQuery({ condition: 'cancer', sort: 'relevance' }, null, null)
+    expect(url).not.toContain('sort=')
   })
 
   it('throws when condition is missing', () => {
