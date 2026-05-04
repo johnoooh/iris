@@ -33,8 +33,10 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
 
   const allTrials = data?.pages.flatMap(p => p.trials) ?? []
 
-  // Eager batch on every search change. resetCache + cancelPending wipe stale
-  // simplifications from the previous query.
+  // Fire when the result set changes — keyed on the first 5 NCT IDs.
+  // Using searchParams as the key would fire too early (before data arrives);
+  // using allTrials would re-fire on every pagination append.
+  const eagerKey = allTrials.slice(0, EAGER_BATCH_SIZE).map(t => t.nctId).join(',')
   useEffect(() => {
     simplifier.cancelPending()
     simplifier.resetCache()
@@ -45,7 +47,7 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
       for (const t of eager) simplifier.enqueueAssessFit(t)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams])
+  }, [eagerKey])
 
   if (isLoading) {
     return (

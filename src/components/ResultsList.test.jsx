@@ -4,6 +4,15 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createElement } from 'react'
 import ResultsList from './ResultsList'
 
+// The eager-batch effect inside ResultsList enqueues simplification tasks once
+// trial data arrives, which would instantiate a real Worker (unavailable in
+// jsdom). Stub the shared worker so the queue can drain harmlessly in tests.
+vi.mock('../workers/sharedNlpWorker', () => ({
+  getSharedWorker: () => ({ postMessage: () => {}, terminate: () => {} }),
+  attachListener: () => () => {},
+  terminateSharedWorker: () => {},
+}))
+
 function wrapper({ children }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return createElement(QueryClientProvider, { client: qc }, children)
