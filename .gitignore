@@ -8,3 +8,9 @@ dist/
 .superpowers/
 CLAUDE.local.md
 .claude/settings.local.json
+
+# Generated audit artifacts
+lighthouse-report*.json
+
+# Local archives
+*.zip
