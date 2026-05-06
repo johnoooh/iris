@@ -16,7 +16,7 @@ Most clinical-trial finders either bury you under jargon designed for principal 
 
 You can verify this yourself: open DevTools, run the production build, watch the Network tab.
 
-The project is named for [**Iris Long**](https://en.wikipedia.org/wiki/ACT_UP) (1934– ), a pharmaceutical chemist who walked into an ACT-UP meeting in 1987, told the room they didn't know enough about the science to fight effectively, and offered to teach anyone who wanted to learn. She founded the Treatment and Data Committee and the AIDS Treatment Registry — work that helped turn AIDS from a death sentence into a manageable condition. Making clinical-trial information accessible to the people who need it most was her project. This one carries her name.
+The project is named for [**Iris Long**](https://en.wikipedia.org/wiki/Iris_Long) (1934–2026), a pharmaceutical chemist who walked into an ACT-UP meeting in 1987, told the room they didn't know enough about the science to fight effectively, and offered to teach anyone who wanted to learn. She founded the Treatment and Data Committee and the AIDS Treatment Registry — work that helped turn AIDS from a death sentence into a manageable condition. Making clinical-trial information accessible to the people who need it most was her project. This one carries her name.
 
 ---
 
