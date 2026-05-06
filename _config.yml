@@ -1,0 +1,16 @@
+# This is a Vite/React app, not a Jekyll site — production deployment goes
+# through .github/workflows/deploy.yml which uploads dist/ via
+# actions/deploy-pages. This _config.yml exists only to keep GitHub's
+# legacy auto-Jekyll happy if it ever runs against the source branch
+# (e.g. while Pages is being reconfigured), by telling it to skip the
+# directories it has no business touching.
+#
+# docs/ contains planning markdown with embedded JSX/code that includes
+# {{ }} patterns Liquid misreads as template variables.
+
+exclude:
+  - docs
+  - dist
+  - node_modules
+  - "*.zip"
+  - "lighthouse-report*.json"
