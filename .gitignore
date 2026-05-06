@@ -14,3 +14,6 @@ lighthouse-report*.json
 
 # Local archives
 *.zip
+
+# Local-only planning/design docs
+docs/superpowers/
