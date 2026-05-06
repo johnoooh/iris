@@ -16,8 +16,12 @@ export default function ResultCard({
   onRequestSimplify,
   inputLanguage = 'en',
   simplificationSupported = true,
+  pane = false,
 }) {
   const nearest = nearestLocation(trial.locations, coords)
+  const wrapperClass = pane
+    ? 'px-7 py-6'
+    : 'bg-white border border-parchment-400 rounded-lg p-5 mb-3 max-w-3xl'
 
   const sumState = simplification?.summarize
   const fitState = simplification?.fit
@@ -27,7 +31,7 @@ export default function ResultCard({
   const showFit = fitState && fitState.status !== 'error' && fitState.text
 
   return (
-    <article className="bg-white border border-parchment-400 rounded-lg p-5 mb-3 max-w-3xl">
+    <article className={wrapperClass}>
       <div className="flex items-start justify-between gap-4 mb-2">
         <h3 className="text-base font-semibold text-parchment-950 leading-snug">{trial.title}</h3>
         <span
@@ -174,17 +178,17 @@ export default function ResultCard({
           href={trial.ctGovUrl}
           target="_blank"
           rel="noreferrer"
-          className="text-parchment-800 underline hover:text-parchment-950"
+          className="text-iris-700 hover:text-iris-900 font-medium"
         >
           View full details on ClinicalTrials.gov →
         </a>
         {trial.contact.phone && (
-          <span className="text-parchment-700">{trial.contact.phone}</span>
+          <span className="text-parchment-800">{trial.contact.phone}</span>
         )}
         {trial.contact.email && (
           <a
             href={`mailto:${trial.contact.email}`}
-            className="text-parchment-700 underline hover:text-parchment-950"
+            className="text-iris-700 hover:text-iris-900 underline"
           >
             {trial.contact.email}
           </a>

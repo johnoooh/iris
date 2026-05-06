@@ -1,8 +1,10 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useGeocode } from '../hooks/useGeocode'
 import { useClinicalTrials } from '../hooks/useClinicalTrials'
 import { useSimplifier } from '../hooks/useSimplifier'
 import ResultCard from './ResultCard'
+import TriageRow from './TriageRow'
+import MobileSheet from './MobileSheet'
 import {
   detectInputLanguage,
   outputLanguageFor,
@@ -10,6 +12,20 @@ import {
 } from '../utils/detectInputLanguage'
 
 const EAGER_BATCH_SIZE = 5
+const MOBILE_BREAKPOINT_PX = 820
+const LIST_WIDTH_PX = 400
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth <= MOBILE_BREAKPOINT_PX
+  )
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT_PX)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  return isMobile
+}
 
 export default function ResultsList({ searchParams, modelKey, userDescription, extractedFields }) {
   // Phase 3 simplification only ships for English and Spanish — those are
@@ -43,6 +59,29 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
   })
 
   const allTrials = data?.pages.flatMap(p => p.trials) ?? []
+
+  const isMobile = useIsMobile()
+  const [selectedNctId, setSelectedNctId] = useState(null)
+  const [sheetOpen, setSheetOpen] = useState(false)
+
+  // Default selection to the first trial when results arrive (desktop only —
+  // on mobile we wait for an explicit tap to open the sheet).
+  useEffect(() => {
+    if (allTrials.length === 0) {
+      setSelectedNctId(null)
+      return
+    }
+    if (!selectedNctId || !allTrials.some(t => t.nctId === selectedNctId)) {
+      setSelectedNctId(allTrials[0].nctId)
+    }
+  }, [allTrials, selectedNctId])
+
+  const selected = allTrials.find(t => t.nctId === selectedNctId) ?? null
+
+  function onSelectTrial(nctId) {
+    setSelectedNctId(nctId)
+    if (isMobile) setSheetOpen(true)
+  }
 
   // Fire when the result set changes — keyed on the first 5 NCT IDs.
   // Using searchParams as the key would fire too early (before data arrives);
@@ -110,40 +149,79 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
     if (extractedFields) simplifier.enqueueAssessFit(trial, { outputLanguage })
   }
 
+  function renderDetail(trial) {
+    return (
+      <ResultCard
+        trial={trial}
+        coords={coords ?? null}
+        simplification={simplifier.states.get(trial.nctId)}
+        onRequestSimplify={simplificationSupported ? handleRequestSimplify : null}
+        inputLanguage={inputLanguage}
+        simplificationSupported={simplificationSupported}
+        pane
+      />
+    )
+  }
+
   return (
-    <section className="px-6 py-6" aria-live="polite" aria-label="Search results">
+    <section className="flex flex-col flex-1 min-h-0" aria-label="Search results">
       {showGeoFallback && (
-        <p className="text-xs text-parchment-700 mb-3 italic">
+        <p className="px-6 py-2 text-xs text-parchment-700 italic border-b border-parchment-200">
           Couldn&apos;t pinpoint that location — showing results without distance filtering.
         </p>
       )}
 
-      <div className="flex items-center gap-4 mb-4">
-        <p className="text-sm text-parchment-800">
+      <div className="px-6 py-3 border-b border-parchment-200 flex items-center gap-4">
+        <p className="font-mono text-[11px] text-parchment-700">
           {totalCount.toLocaleString()} trial{totalCount !== 1 ? 's' : ''} found
         </p>
       </div>
 
-      {allTrials.map(trial => (
-        <ResultCard
-          key={trial.nctId}
-          trial={trial}
-          coords={coords ?? null}
-          simplification={simplifier.states.get(trial.nctId)}
-          onRequestSimplify={simplificationSupported ? handleRequestSimplify : null}
-          inputLanguage={inputLanguage}
-          simplificationSupported={simplificationSupported}
-        />
-      ))}
+      <div
+        className="flex-1 grid min-h-0 overflow-hidden"
+        style={{
+          gridTemplateColumns: isMobile ? '1fr' : `${LIST_WIDTH_PX}px 1fr`,
+        }}
+      >
+        <div className="overflow-auto bg-parchment-100 border-r border-parchment-200 flex flex-col">
+          <ul className="flex flex-col">
+            {allTrials.map(trial => (
+              <li key={trial.nctId} className="border-b border-parchment-200">
+                <TriageRow
+                  trial={trial}
+                  coords={coords ?? null}
+                  selected={!isMobile && trial.nctId === selectedNctId}
+                  onSelect={onSelectTrial}
+                />
+              </li>
+            ))}
+          </ul>
+          {hasNextPage && (
+            <button
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+              className="m-4 text-sm text-iris-700 hover:text-iris-900 underline disabled:opacity-50 self-start"
+            >
+              {isFetchingNextPage ? 'Loading…' : 'Load more results'}
+            </button>
+          )}
+        </div>
 
-      {hasNextPage && (
-        <button
-          onClick={() => fetchNextPage()}
-          disabled={isFetchingNextPage}
-          className="mt-4 text-sm text-parchment-800 underline hover:text-parchment-950 disabled:opacity-50"
+        {!isMobile && (
+          <div className="overflow-auto bg-white" aria-live="polite">
+            {selected && renderDetail(selected)}
+          </div>
+        )}
+      </div>
+
+      {isMobile && (
+        <MobileSheet
+          open={sheetOpen}
+          onClose={() => setSheetOpen(false)}
+          label={selected ? `Trial details: ${selected.title}` : 'Trial details'}
         >
-          {isFetchingNextPage ? 'Loading…' : 'Load more results'}
-        </button>
+          {selected && renderDetail(selected)}
+        </MobileSheet>
       )}
     </section>
   )

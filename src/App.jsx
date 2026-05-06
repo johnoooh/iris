@@ -69,7 +69,7 @@ function IrisApp() {
     <div className="min-h-screen bg-parchment-50 flex flex-col">
       <Header />
       <PrivacyStatement />
-      <main className="flex-1">
+      <main className="flex-1 flex flex-col min-h-0">
         <NaturalLanguageInput onExtract={handleExtract} />
         <SearchForm onSearch={setSearchParams} prefill={prefill} />
         {searchParams && (
