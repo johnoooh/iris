@@ -208,3 +208,55 @@ describe('useNLP — onerror handler', () => {
     expect(result.current.error).toBe('worker crash')
   })
 })
+
+describe('useNLP — clearLocalData()', () => {
+  beforeEach(() => {
+    vi.stubGlobal('navigator', { gpu: {} })
+  })
+
+  it('posts an unload message to the worker with the modelId', () => {
+    const { result } = renderHook(() => useNLP())
+    act(() => { result.current.clearLocalData('gemma-2-2b-it-q4f32_1-MLC') })
+    const call = mockWorker.postMessage.mock.calls.find(c => c[0].type === 'unload')
+    expect(call).toBeDefined()
+    expect(call[0]).toEqual({ type: 'unload', modelId: 'gemma-2-2b-it-q4f32_1-MLC' })
+  })
+
+  it('resolves and returns to idle status when worker posts unloaded', async () => {
+    const { result } = renderHook(() => useNLP())
+    act(() => result.current.load())
+    act(() => mockWorker.onmessage({ data: { type: 'ready' } }))
+    expect(result.current.status).toBe('ready')
+
+    let cleared = false
+    const unloadPromise = act(async () => {
+      await result.current.clearLocalData('gemma-2-2b-it-q4f32_1-MLC')
+      cleared = true
+    })
+
+    act(() => mockWorker.onmessage({ data: { type: 'unloaded' } }))
+    await unloadPromise
+
+    expect(cleared).toBe(true)
+    expect(result.current.status).toBe('idle')
+    expect(result.current.error).toBeNull()
+  })
+
+  it('rejects when worker posts an error during unload', async () => {
+    const { result } = renderHook(() => useNLP())
+    let caught = null
+    const unloadPromise = act(async () => {
+      try { await result.current.clearLocalData('id') } catch (err) { caught = err }
+    })
+    act(() => mockWorker.onmessage({ data: { type: 'error', message: 'IndexedDB delete failed' } }))
+    await unloadPromise
+    expect(caught).toBeInstanceOf(Error)
+    expect(caught.message).toBe('IndexedDB delete failed')
+  })
+
+  it('rejects concurrent clearLocalData() calls', async () => {
+    const { result } = renderHook(() => useNLP())
+    act(() => { result.current.clearLocalData('id') })
+    await expect(result.current.clearLocalData('id')).rejects.toThrow('Unload already in progress')
+  })
+})

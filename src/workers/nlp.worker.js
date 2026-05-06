@@ -2,16 +2,18 @@
 // Dynamically imported so @mlc-ai/web-llm stays out of the main bundle.
 
 // Message protocol:
-//   IN  { type: 'load', modelId, isThinking } — initializes MLCEngine
+//   IN  { type: 'load', modelId, isThinking }  — initializes MLCEngine
 //   IN  { type: 'extract', text }              — Phase 2 extraction (one-shot)
 //   IN  { type: 'summarize',  taskId, prompt } — Phase 3 summarize, streaming
 //   IN  { type: 'assess_fit', taskId, prompt } — Phase 3 fit, streaming
+//   IN  { type: 'unload', modelId }            — release GPU memory + delete cached weights
 //   OUT { type: 'progress', progress }         — load progress
 //   OUT { type: 'ready' }                      — engine initialized
 //   OUT { type: 'result', raw }                — Phase 2 extract output
 //   OUT { type: 'chunk',     taskId, text }    — streaming token batch
 //   OUT { type: 'task_done', taskId }          — stream finished cleanly
 //   OUT { type: 'task_error', taskId, message }— stream errored
+//   OUT { type: 'unloaded' }                   — engine torn down + cache cleared
 //   OUT { type: 'error', message }             — load or extract error
 let engine = null
 let loading = false
@@ -79,6 +81,27 @@ self.onmessage = async (event) => {
         return
       }
       self.postMessage({ type: 'result', raw })
+    } catch (err) {
+      self.postMessage({ type: 'error', message: err?.message ?? String(err) })
+    }
+    return
+  }
+
+  if (type === 'unload') {
+    try {
+      const idToDelete = modelId ?? DEFAULT_MODEL_ID
+      // Release the engine first so its WebGPU buffers are freed before we
+      // delete the on-disk cache. Best-effort; older WebLLM versions may
+      // not expose unload().
+      if (engine && typeof engine.unload === 'function') {
+        try { await engine.unload() } catch { /* best effort */ }
+      }
+      engine = null
+      loading = false
+      isThinkingModel = false
+      const { deleteModelAllInfoInCache } = await import('@mlc-ai/web-llm')
+      await deleteModelAllInfoInCache(idToDelete)
+      self.postMessage({ type: 'unloaded' })
     } catch (err) {
       self.postMessage({ type: 'error', message: err?.message ?? String(err) })
     }

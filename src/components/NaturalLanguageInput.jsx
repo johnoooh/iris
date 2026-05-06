@@ -20,9 +20,12 @@ export default function NaturalLanguageInput({ onExtract }) {
   )
   const model = NLP_MODELS[modelKey]
 
-  const { status, progress, error, webGPUSupported, load, extract } = useNLP()
+  const { status, progress, error, webGPUSupported, load, extract, clearLocalData } = useNLP()
 
   const hasAutoLoaded = useRef(false)
+  const [confirmingClear, setConfirmingClear] = useState(false)
+  const [clearing, setClearing] = useState(false)
+  const [clearError, setClearError] = useState(null)
 
   // Auto-load model on expand if user previously consented
   useEffect(() => {
@@ -38,6 +41,24 @@ export default function NaturalLanguageInput({ onExtract }) {
     try { localStorage.setItem(STORAGE_KEY, 'true') } catch { /* private browsing */ }
     setConsented(true)
     load(model.id, { isThinking: model.isThinking, chatOpts: model.chatOpts })
+  }
+
+  async function handleClearLocalData() {
+    setClearError(null)
+    setClearing(true)
+    try {
+      await clearLocalData(model.id)
+      try { localStorage.removeItem(STORAGE_KEY) } catch { /* private browsing */ }
+      setConsented(false)
+      setExtracted(null)
+      setText('')
+      setConfirmingClear(false)
+      hasAutoLoaded.current = false
+    } catch (err) {
+      setClearError(err?.message ?? 'Could not clear local data')
+    } finally {
+      setClearing(false)
+    }
   }
 
   async function handleSubmit(e) {
@@ -153,28 +174,78 @@ export default function NaturalLanguageInput({ onExtract }) {
 
           {/* Ready / extracting */}
           {webGPUSupported && consented && (status === 'ready' || status === 'extracting') && (
-            <form onSubmit={handleSubmit}>
-              <textarea
-                rows={3}
-                value={text}
-                onChange={e => setText(e.target.value)}
-                placeholder="e.g. 52-year-old woman in Brooklyn with triple negative breast cancer, already did chemo"
-                className="w-full border border-parchment-400 rounded-md px-3 py-2 text-sm bg-white text-parchment-950 resize-none focus:outline-none focus:ring-2 focus:ring-parchment-800"
-                aria-label="Natural language search"
-                disabled={status === 'extracting'}
-              />
-              <p className="mt-1 text-xs text-parchment-700">
-                IRIS will extract condition, location, age, and other relevant details automatically.
-                {' '}<span className="text-parchment-500">Model: {model.label}</span>
-              </p>
-              <button
-                type="submit"
-                disabled={status === 'extracting' || !text.trim()}
-                className="mt-2 bg-parchment-800 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-parchment-950 disabled:opacity-50"
-              >
-                {status === 'extracting' ? 'Extracting…' : 'Find trials →'}
-              </button>
-            </form>
+            <>
+              <form onSubmit={handleSubmit}>
+                <textarea
+                  rows={3}
+                  value={text}
+                  onChange={e => setText(e.target.value)}
+                  placeholder="e.g. 52-year-old woman in Brooklyn with triple negative breast cancer, already did chemo"
+                  className="w-full border border-parchment-400 rounded-md px-3 py-2 text-sm bg-white text-parchment-950 resize-none focus:outline-none focus:ring-2 focus:ring-parchment-800"
+                  aria-label="Natural language search"
+                  disabled={status === 'extracting'}
+                />
+                <p className="mt-1 text-xs text-parchment-700">
+                  IRIS will extract condition, location, age, and other relevant details automatically.
+                  {' '}<span className="text-parchment-500">Model: {model.label}</span>
+                </p>
+                <button
+                  type="submit"
+                  disabled={status === 'extracting' || !text.trim()}
+                  className="mt-2 bg-parchment-800 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-parchment-950 disabled:opacity-50"
+                >
+                  {status === 'extracting' ? 'Extracting…' : 'Find trials →'}
+                </button>
+              </form>
+
+              {/* Clear local data — the model is the only thing IRIS stores
+                  locally, so this returns the user to a fresh state. */}
+              <div className="mt-4 pt-3 border-t border-parchment-300 text-xs">
+                {!confirmingClear && (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingClear(true)}
+                    disabled={status === 'extracting'}
+                    className="text-parchment-700 underline hover:text-parchment-950 disabled:opacity-50"
+                  >
+                    Clear local data ({model.sizeLabel})
+                  </button>
+                )}
+                {confirmingClear && (
+                  <div className="bg-parchment-50 border border-parchment-300 rounded-md p-3">
+                    <p className="text-parchment-900 mb-1">
+                      Delete the AI model from your browser?
+                    </p>
+                    <p className="text-parchment-700 mb-2">
+                      The model ({model.sizeLabel}) is the only data IRIS stores locally. After
+                      deleting, you can re-enable the natural-language feature later — it will
+                      re-download the model.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleClearLocalData}
+                        disabled={clearing}
+                        className="bg-parchment-800 text-white px-3 py-1.5 rounded-md font-semibold hover:bg-parchment-950 disabled:opacity-50"
+                      >
+                        {clearing ? 'Deleting…' : 'Delete'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setConfirmingClear(false); setClearError(null) }}
+                        disabled={clearing}
+                        className="border border-parchment-400 text-parchment-800 px-3 py-1.5 rounded-md hover:text-parchment-950 disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    {clearError && (
+                      <p className="text-red-700 mt-2">Couldn&apos;t delete: {clearError}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
           )}
 
           {/* Confirmation card */}
