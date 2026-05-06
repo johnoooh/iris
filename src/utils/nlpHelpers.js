@@ -11,9 +11,32 @@ Return ONLY valid JSON. Omit any field you cannot determine.
 }
 
 Rules:
-- "condition" is the medical condition or disease name
-- "location" is a city, state, zip code, or region if mentioned
-- "sex" defaults to "ALL" unless patient gender is clearly stated
+- All output values MUST be in ENGLISH, even if the patient writes in another language. ClinicalTrials.gov is an English-only registry.
+  - Translate EVERY word of the condition to standard English medical terminology — including adjectives. Multi-word phrases must be fully translated:
+    - "cáncer de mama" → "breast cancer"
+    - "diabetes tipo 2" → "type 2 diabetes"
+    - "melanoma metastásico" → "metastatic melanoma" (NOT "melanoma metastásico")
+    - "leucemia linfoblástica aguda" → "acute lymphoblastic leukemia"
+    - "insuficiencia cardíaca" → "heart failure"
+    - "depresión resistente al tratamiento" → "treatment-resistant depression"
+  - Translate place names to their common English form (e.g. "Los Ángeles" → "Los Angeles", "Filadelfia" → "Philadelphia", "Nueva York" → "New York").
+- "condition" must be a precise medical term, not the patient's casual phrasing.
+  - Replace vague words like "problems", "issues", "trouble", "problemas" with the proper medical term using "disease" or "disorder":
+    - "kidney problems" → "kidney disease"
+    - "problemas renales" → "kidney disease"
+    - "heart problems" → "heart disease"
+    - "stomach issues" → "gastrointestinal disease"
+    - "breathing trouble" → "respiratory disease"
+  - ClinicalTrials.gov indexes formal disease names ("kidney disease", "renal failure"), not colloquial complaints ("kidney problems"). Using the casual word will return zero results.
+- "location" must be a SPECIFIC place: a city, "City, State", or a zip code. Examples: "Los Angeles", "Boston, MA", "10024".
+  - Do NOT use a whole U.S. state alone ("California"), country ("USA"), region ("the West Coast"), or vague phrase ("near me", "nearby", "or nearby").
+  - If the patient mentions only a state or region with no specific city, set location to null.
+  - If multiple cities are mentioned, pick the most specific one the patient names first.
+  - Strip qualifiers like "or nearby", "area", "the", "near".
+- "sex" must be "ALL" UNLESS the patient explicitly identifies their own gender in plain words ("I'm a woman", "soy hombre", "as a man", "I'm female"). When in doubt, ALWAYS return "ALL".
+  - Do NOT infer sex from the condition. Breast cancer, prostate cancer, ovarian cancer, etc. do not imply the patient's sex — men get breast cancer too.
+  - Do NOT infer sex from grammatical gender. Arabic, Spanish, French, etc. use masculine forms by default; this is grammar, not a statement about the speaker. "عمري 58 عامًا ولدي سرطان الثدي" → "ALL", not "MALE".
+  - Do NOT guess. If the patient describes a condition without saying their gender, return "ALL".
 - "phases" only if explicitly mentioned (e.g. "Phase 2 trial")
 - Do NOT include a "status" field — recruitment status is handled separately.
 - Return ONLY the JSON object, no explanation

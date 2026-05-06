@@ -12,6 +12,40 @@ describe('buildPrompt', () => {
     expect(prompt).toContain('"condition"')
     expect(prompt).toContain('Return ONLY valid JSON')
   })
+
+  it('instructs the model not to infer sex from the condition', () => {
+    const prompt = buildPrompt('test')
+    expect(prompt).toMatch(/breast cancer.*do not imply|do not imply.*breast cancer/i)
+  })
+
+  it('instructs the model not to infer sex from grammatical gender', () => {
+    const prompt = buildPrompt('test')
+    expect(prompt).toMatch(/grammatical gender/i)
+  })
+
+  it('instructs the model to translate non-English input to English', () => {
+    const prompt = buildPrompt('test')
+    expect(prompt).toMatch(/ENGLISH/i)
+    expect(prompt).toContain('cáncer de mama')
+  })
+
+  it('instructs the model to translate multi-word condition phrases (adjective + noun)', () => {
+    const prompt = buildPrompt('test')
+    expect(prompt).toContain('melanoma metastásico')
+    expect(prompt).toContain('metastatic melanoma')
+  })
+
+  it('instructs the model to replace vague "problems" with formal "disease"/"disorder"', () => {
+    const prompt = buildPrompt('test')
+    expect(prompt).toMatch(/kidney problems.*kidney disease/i)
+    expect(prompt).toMatch(/problemas/i)
+  })
+
+  it('instructs the model to translate Spanish place names to their English form', () => {
+    const prompt = buildPrompt('test')
+    expect(prompt).toContain('Filadelfia')
+    expect(prompt).toContain('Philadelphia')
+  })
 })
 
 describe('parseExtraction', () => {
