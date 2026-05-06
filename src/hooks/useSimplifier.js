@@ -146,7 +146,7 @@ export function useSimplifier({ modelKey, userDescription, extractedFields }) {
     getSharedWorker().postMessage({ type: next.type, taskId: next.taskId, prompt: next.prompt })
   }
 
-  const enqueueSummarize = useCallback((trial) => {
+  const enqueueSummarize = useCallback((trial, options = {}) => {
     const nctId = trial.nctId
     const key = statusKey(nctId, 'summarize')
     const existing = statusRef.current.get(key)
@@ -163,12 +163,12 @@ export function useSimplifier({ modelKey, userDescription, extractedFields }) {
       taskId,
       type: 'summarize',
       nctId,
-      prompt: buildSummarizePrompt(trial),
+      prompt: buildSummarizePrompt(trial, options),
     })
     maybeStartNext()
   }, [modelKey])
 
-  const enqueueAssessFit = useCallback((trial) => {
+  const enqueueAssessFit = useCallback((trial, options = {}) => {
     if (!extractedFields) return
     const nctId = trial.nctId
     const key = statusKey(nctId, 'assess_fit')
@@ -186,7 +186,7 @@ export function useSimplifier({ modelKey, userDescription, extractedFields }) {
       taskId,
       type: 'assess_fit',
       nctId,
-      prompt: buildAssessFitPrompt(trial, extractedFields, userDescription),
+      prompt: buildAssessFitPrompt(trial, extractedFields, userDescription, options),
     })
     maybeStartNext()
   }, [extractedFields, userDescription, modelKey])

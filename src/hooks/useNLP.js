@@ -64,6 +64,7 @@ export function useNLP() {
       type: 'load',
       modelId,
       isThinking: Boolean(options.isThinking),
+      chatOpts: options.chatOpts,
     })
   }, [webGPUSupported])
 

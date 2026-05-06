@@ -20,7 +20,7 @@ let isThinkingModel = false
 const DEFAULT_MODEL_ID = 'gemma-2-2b-it-q4f32_1-MLC'
 
 self.onmessage = async (event) => {
-  const { type, text, modelId, isThinking, taskId, prompt } = event.data
+  const { type, text, modelId, isThinking, chatOpts, taskId, prompt } = event.data
 
   if (type === 'load') {
     if (engine) { self.postMessage({ type: 'ready' }); return }
@@ -29,11 +29,20 @@ self.onmessage = async (event) => {
     isThinkingModel = Boolean(isThinking)
     try {
       const { CreateMLCEngine } = await import('@mlc-ai/web-llm')
-      engine = await CreateMLCEngine(modelId ?? DEFAULT_MODEL_ID, {
-        initProgressCallback: (progress) => {
-          self.postMessage({ type: 'progress', progress })
+      // CreateMLCEngine signature: (modelId, engineConfig, chatOpts).
+      // chatOpts is per-model config override (e.g. sliding_window_size:-1
+      // for gemma3, whose prebuilt record sets context_window_size:4096
+      // alongside sliding_window_size:512 — the engine rejects both being
+      // positive).
+      engine = await CreateMLCEngine(
+        modelId ?? DEFAULT_MODEL_ID,
+        {
+          initProgressCallback: (progress) => {
+            self.postMessage({ type: 'progress', progress })
+          },
         },
-      })
+        chatOpts ?? undefined,
+      )
       loading = false
       self.postMessage({ type: 'ready' })
     } catch (err) {
@@ -49,9 +58,17 @@ self.onmessage = async (event) => {
       return
     }
     try {
+      // Same rationale as the summarize path — clear KV cache between calls
+      // so latency stays flat across many extractions in a row.
+      if (typeof engine.resetChat === 'function') {
+        try { await engine.resetChat() } catch { /* best effort */ }
+      }
       const request = {
         messages: [{ role: 'user', content: text }],
-        max_tokens: 200,
+        // 400 tokens is enough headroom for the schema plus any preamble
+        // the smaller multilingual models occasionally emit before the
+        // JSON object. The schema is small so this is still cheap.
+        max_tokens: 400,
         temperature: 0.1,
       }
       if (isThinkingModel) request.extra_body = { enable_thinking: false }
@@ -74,10 +91,24 @@ self.onmessage = async (event) => {
       return
     }
     try {
+      // Reset the chat KV cache between tasks. WebLLM's MLCEngine retains
+      // conversation state across calls by default — running 20 summarize
+      // tasks in sequence accumulates ~20× the prompt tokens in working
+      // memory, which causes monotonic latency growth and eventually OOM.
+      // Each task here is independent (one-shot, no follow-up turns), so
+      // resetting before each call gives every task the same fresh context.
+      if (typeof engine.resetChat === 'function') {
+        try { await engine.resetChat() } catch { /* best effort */ }
+      }
       const request = {
         messages: [{ role: 'user', content: prompt }],
         max_tokens: type === 'summarize' ? 500 : 250,
-        temperature: 0.2,
+        // Summarize uses temperature 0 (greedy) because faithfulness to the
+        // source matters more than fluency variation — fabrications drop
+        // significantly at low temperatures. Assess-fit keeps a small
+        // temperature so its hedging language ("may", "might") doesn't
+        // collapse into a single deterministic phrase across trials.
+        temperature: type === 'summarize' ? 0 : 0.2,
         stream: true,
       }
       if (isThinkingModel) request.extra_body = { enable_thinking: false }

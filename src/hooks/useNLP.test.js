@@ -59,6 +59,7 @@ describe('useNLP — load()', () => {
       type: 'load',
       modelId: 'Qwen3-1.7B-q4f32_1-MLC',
       isThinking: true,
+      chatOpts: undefined,
     })
   })
 
@@ -69,6 +70,18 @@ describe('useNLP — load()', () => {
       type: 'load',
       modelId: 'gemma-2-2b-it-q4f32_1-MLC',
       isThinking: false,
+      chatOpts: undefined,
+    })
+  })
+
+  it('forwards chatOpts to the worker so per-model engine config can override prebuilt defaults', () => {
+    const { result } = renderHook(() => useNLP())
+    act(() => result.current.load('gemma3-1b-it-q4f16_1-MLC', { chatOpts: { sliding_window_size: -1 } }))
+    expect(mockWorker.postMessage).toHaveBeenCalledWith({
+      type: 'load',
+      modelId: 'gemma3-1b-it-q4f16_1-MLC',
+      isThinking: false,
+      chatOpts: { sliding_window_size: -1 },
     })
   })
 
