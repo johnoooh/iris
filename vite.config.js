@@ -1,6 +1,12 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+// The --no-experimental-webstorage flag was added in Node 22 (when
+// experimental localStorage shipped). Older Node versions don't recognize
+// it and crash the worker forks before any test runs (CI on Node 20 was
+// hitting EPIPE here). Emit the flag only on Node 22+.
+const nodeMajor = Number(process.versions.node.split('.')[0])
+
 export default defineConfig({
   plugins: [react()],
   base: '/iris/',
@@ -11,7 +17,8 @@ export default defineConfig({
     // Vitest 4.x's default include glob walks node_modules in some
     // installs (zod ships its own *.test.ts files); pin tests to src/.
     include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
-    // Node 25 ships experimental localStorage that conflicts with jsdom's implementation
-    execArgv: ['--no-experimental-webstorage'],
+    // Disable Node's experimental localStorage so jsdom's implementation
+    // can take over without conflict. Only valid on Node 22+.
+    execArgv: nodeMajor >= 22 ? ['--no-experimental-webstorage'] : [],
   },
 })
