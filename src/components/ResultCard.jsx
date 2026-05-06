@@ -1,5 +1,6 @@
 import PhaseExplainer from './PhaseExplainer'
 import { nearestLocation } from '../utils/apiHelpers'
+import { UNSUPPORTED_LANGUAGE_HINTS } from '../utils/detectInputLanguage'
 
 const STATUS_STYLES = {
   RECRUITING: 'bg-green-100 text-green-800',
@@ -8,7 +9,14 @@ const STATUS_STYLES = {
   TERMINATED: 'bg-red-100 text-red-700',
 }
 
-export default function ResultCard({ trial, coords, simplification, onRequestSimplify }) {
+export default function ResultCard({
+  trial,
+  coords,
+  simplification,
+  onRequestSimplify,
+  inputLanguage = 'en',
+  simplificationSupported = true,
+}) {
   const nearest = nearestLocation(trial.locations, coords)
 
   const sumState = simplification?.summarize
@@ -112,7 +120,7 @@ export default function ResultCard({ trial, coords, simplification, onRequestSim
       )}
 
       {/* ON-DEMAND BUTTON — when no simplification yet and a callback is wired */}
-      {!simplification && onRequestSimplify && (
+      {!simplification && onRequestSimplify && simplificationSupported && (
         <button
           type="button"
           onClick={() => onRequestSimplify(trial)}
@@ -120,6 +128,19 @@ export default function ResultCard({ trial, coords, simplification, onRequestSim
         >
           Show in plain language
         </button>
+      )}
+
+      {/* UNSUPPORTED-LANGUAGE HINT — when the user typed in a language the
+          local model can't reliably simplify (Mandarin, Arabic, etc.). The
+          hint duplicates the call-to-action in the user's likely script
+          plus English so it's actionable before they invoke browser translate. */}
+      {!simplificationSupported && (
+        <p
+          className="text-xs text-parchment-700 italic mb-3"
+          dir={inputLanguage === 'ar' ? 'rtl' : 'ltr'}
+        >
+          {UNSUPPORTED_LANGUAGE_HINTS[inputLanguage] ?? UNSUPPORTED_LANGUAGE_HINTS.other}
+        </p>
       )}
 
       {/* ORIGINAL PROSE — shown when no simplification (default Phase 1 path) */}

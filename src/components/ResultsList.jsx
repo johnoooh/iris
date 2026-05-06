@@ -1,12 +1,23 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useGeocode } from '../hooks/useGeocode'
 import { useClinicalTrials } from '../hooks/useClinicalTrials'
 import { useSimplifier } from '../hooks/useSimplifier'
 import ResultCard from './ResultCard'
+import {
+  detectInputLanguage,
+  outputLanguageFor,
+  SUPPORTED_SIMPLIFICATION_LANGUAGES,
+} from '../utils/detectInputLanguage'
 
 const EAGER_BATCH_SIZE = 5
 
 export default function ResultsList({ searchParams, modelKey, userDescription, extractedFields }) {
+  // Phase 3 simplification only ships for English and Spanish — those are
+  // the languages we've verified the local model produces accurately.
+  // Other languages get a "use browser translate" hint instead.
+  const inputLanguage = useMemo(() => detectInputLanguage(userDescription), [userDescription])
+  const simplificationSupported = SUPPORTED_SIMPLIFICATION_LANGUAGES.has(inputLanguage)
+  const outputLanguage = outputLanguageFor(inputLanguage)
   const {
     data: coords,
     isError: geoFailed,
@@ -41,13 +52,14 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
     simplifier.cancelPending()
     simplifier.resetCache()
     if (allTrials.length === 0) return
+    if (!simplificationSupported) return
     const eager = allTrials.slice(0, EAGER_BATCH_SIZE)
-    for (const t of eager) simplifier.enqueueSummarize(t)
+    for (const t of eager) simplifier.enqueueSummarize(t, { outputLanguage })
     if (extractedFields) {
-      for (const t of eager) simplifier.enqueueAssessFit(t)
+      for (const t of eager) simplifier.enqueueAssessFit(t, { outputLanguage })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eagerKey])
+  }, [eagerKey, simplificationSupported, outputLanguage])
 
   if (isLoading) {
     return (
@@ -93,8 +105,9 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
   }
 
   function handleRequestSimplify(trial) {
-    simplifier.enqueueSummarize(trial)
-    if (extractedFields) simplifier.enqueueAssessFit(trial)
+    if (!simplificationSupported) return
+    simplifier.enqueueSummarize(trial, { outputLanguage })
+    if (extractedFields) simplifier.enqueueAssessFit(trial, { outputLanguage })
   }
 
   return (
@@ -117,7 +130,9 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
           trial={trial}
           coords={coords ?? null}
           simplification={simplifier.states.get(trial.nctId)}
-          onRequestSimplify={handleRequestSimplify}
+          onRequestSimplify={simplificationSupported ? handleRequestSimplify : null}
+          inputLanguage={inputLanguage}
+          simplificationSupported={simplificationSupported}
         />
       ))}
 

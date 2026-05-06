@@ -30,14 +30,14 @@ export default function NaturalLanguageInput({ onExtract }) {
     if (hasAutoLoaded.current) return
     if (consented && status === 'idle' && webGPUSupported) {
       hasAutoLoaded.current = true
-      load(model.id, { isThinking: model.isThinking })
+      load(model.id, { isThinking: model.isThinking, chatOpts: model.chatOpts })
     }
   }, [expanded, consented, status, webGPUSupported, load, model.id])
 
   function handleConsent() {
     try { localStorage.setItem(STORAGE_KEY, 'true') } catch { /* private browsing */ }
     setConsented(true)
-    load(model.id)
+    load(model.id, { isThinking: model.isThinking, chatOpts: model.chatOpts })
   }
 
   async function handleSubmit(e) {
