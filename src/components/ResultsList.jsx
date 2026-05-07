@@ -304,7 +304,7 @@ function ResultsToolbar({ totalCount, searchParams }) {
               onClick={() => !opt.disabled && setSort(opt.id)}
               disabled={opt.disabled}
               title={opt.title}
-              aria-pressed={active}
+              {...(opt.disabled ? {} : { 'aria-pressed': active })}
               className={[
                 'text-[11px] px-2 py-0.5 rounded-md transition-colors',
                 opt.disabled

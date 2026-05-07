@@ -32,16 +32,24 @@ export default function NaturalLanguageInput({ onExtract, embedded = false }) {
   const [pendingSubmit, setPendingSubmit] = useState(false)
 
   // Auto-load model on expand if user previously consented.
+  //
   // The cleanup resets hasAutoLoaded so React StrictMode's dev double-invoke
-  // (mount → cleanup → re-run) re-fires load() on the second pass; load()
+  // (mount → cleanup → re-run) re-fires load() on the second pass — load()
   // is what re-attaches the worker listener via ensureSubscribed. Without
   // this reset, the listener detached during cleanup never gets re-attached
   // and the worker's eventual 'ready' message broadcasts to an empty Set,
   // leaving status stuck on 'downloading' forever.
+  //
+  // Gate is `status === 'idle'` only — NOT `'idle' || 'downloading'`. Each
+  // StrictMode remount creates a fresh useNLP with status='idle' so the
+  // narrow gate still fires correctly on remount. Widening to 'downloading'
+  // would re-fire load() after every status flip during the download
+  // (cleanup → reset hasAutoLoaded → re-run → matches widened gate → re-load),
+  // posting redundant load messages to the worker.
   useEffect(() => {
     if (!expanded) { hasAutoLoaded.current = false; return }
     if (hasAutoLoaded.current) return
-    if (consented && (status === 'idle' || status === 'downloading') && webGPUSupported) {
+    if (consented && status === 'idle' && webGPUSupported) {
       hasAutoLoaded.current = true
       load(model.id, { isThinking: model.isThinking, chatOpts: model.chatOpts })
     }
