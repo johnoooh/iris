@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel in-progress runs for the same ref so a force-push doesn't queue
+# stale CI.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          # vite.config.js conditionally emits --no-experimental-webstorage
+          # for Node >= 22, so CI must run Node 22 to match local dev.
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Lint currently fails on pre-existing errors in main (e.g. vite.config.js
+      # 'process' is not defined, useNLP exhaustive-deps warnings). Run as a
+      # non-blocking informational step until those are fixed in a follow-up;
+      # build + tests are the real merge gate.
+      - name: Lint (non-blocking)
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Test
+        run: npm run test:run
+
+      - name: Build
+        run: npm run build
