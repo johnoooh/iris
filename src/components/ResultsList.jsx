@@ -181,11 +181,10 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
         </p>
       )}
 
-      <div className="px-6 py-3 border-b border-parchment-200 flex items-center gap-4">
-        <p className="font-mono text-[11px] text-parchment-700">
-          {totalCount.toLocaleString()} trial{totalCount !== 1 ? 's' : ''} found
-        </p>
-      </div>
+      <ResultsToolbar
+        totalCount={totalCount}
+        searchParams={searchParams}
+      />
 
       <div
         className="flex-1 grid min-h-0 overflow-hidden"
@@ -244,6 +243,83 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
         </MobileSheet>
       )}
     </section>
+  )
+}
+
+const STATUS_LABELS = {
+  RECRUITING: 'recruiting',
+  NOT_YET_RECRUITING: 'not yet recruiting',
+  ACTIVE_NOT_RECRUITING: 'active, not recruiting',
+  COMPLETED: 'completed',
+  ALL: null,
+}
+
+const PHASE_LABELS = {
+  EARLY_PHASE1: 'Early Phase 1',
+  PHASE1: 'Phase 1',
+  PHASE2: 'Phase 2',
+  PHASE3: 'Phase 3',
+  PHASE4: 'Phase 4',
+}
+
+const SORT_OPTIONS = [
+  { id: 'fit',      label: 'Best fit',     disabled: true, title: 'Available once on-device classification runs' },
+  { id: 'distance', label: 'Distance',     disabled: false },
+  { id: 'phase',    label: 'Phase',        disabled: false },
+  { id: 'recent',   label: 'Most recent',  disabled: false },
+]
+
+function ResultsToolbar({ totalCount, searchParams }) {
+  const [sort, setSort] = useState('recent')
+
+  const summaryParts = [`${totalCount.toLocaleString()} trial${totalCount !== 1 ? 's' : ''}`]
+  if (searchParams.location) summaryParts.push(`near ${searchParams.location}`)
+  if (searchParams.location && searchParams.radius) summaryParts.push(`within ${searchParams.radius} mi`)
+  const statusLabel = STATUS_LABELS[searchParams.status]
+  if (statusLabel) summaryParts.push(statusLabel)
+  if (searchParams.phases?.length) {
+    summaryParts.push(searchParams.phases.map(p => PHASE_LABELS[p] ?? p).join(' / '))
+  }
+
+  return (
+    <div className="px-6 py-3 border-b border-parchment-200 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+      <p className="font-mono text-[11px] text-parchment-700 leading-snug">
+        {summaryParts.map((part, i) => (
+          <span key={i}>
+            {i > 0 && <span className="text-parchment-300 mx-1.5" aria-hidden="true">·</span>}
+            {part}
+          </span>
+        ))}
+      </p>
+      <div className="flex items-center gap-1" role="group" aria-label="Sort results">
+        <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-parchment-700 mr-2">
+          sort
+        </span>
+        {SORT_OPTIONS.map(opt => {
+          const active = sort === opt.id
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => !opt.disabled && setSort(opt.id)}
+              disabled={opt.disabled}
+              title={opt.title}
+              aria-pressed={active}
+              className={[
+                'text-[11px] px-2 py-0.5 rounded-md transition-colors',
+                opt.disabled
+                  ? 'text-parchment-500 cursor-not-allowed'
+                  : active
+                    ? 'bg-iris-50 text-iris-700 font-medium'
+                    : 'text-parchment-700 hover:text-parchment-950 hover:bg-parchment-100',
+              ].join(' ')}
+            >
+              {opt.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
