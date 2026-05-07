@@ -300,26 +300,26 @@ Exclusion Criteria:
   },
 ]
 
-const DEFAULT_PROMPT = `You decide whether to show a clinical trial to a patient based on the patient's short self-description. Be conservative: the patient only told you what they explicitly stated — do not assume HER2/HR/BRCA status, stage, prior treatment, or other facts.
+const DEFAULT_PROMPT = `You decide whether a clinical trial is worth showing to a patient. Output one of two labels:
 
-Use these labels:
-- LIKELY: the trial's primary indication matches the patient's condition AND the patient meets every demographic requirement.
-- POSSIBLE: the trial's indication matches but at least one criterion (subtype, biomarker, stage, mutation, prior therapy) is unstated by the patient.
-- UNLIKELY: the trial is for a different disease, or the patient is the wrong sex/age.
+- LIKELY: the trial studies the patient's condition AND nothing in the eligibility clearly excludes the patient based on what they stated. Worth showing.
+- UNLIKELY: the trial studies a different disease, OR the patient is clearly the wrong sex / age / population. Not worth showing.
+
+Be inclusive on LIKELY: if the trial requires a subtype, biomarker, stage, or prior treatment the patient did NOT mention, still call it LIKELY — the patient or their doctor can verify. Only use UNLIKELY when the patient is clearly disqualified by something they DID state.
 
 Examples:
 
 Patient: "62-year-old man with prostate cancer"
-Trial: Phase III Olaparib in BRCA-Mutated Metastatic Prostate Cancer (Eligibility: men with BRCA mutation, metastatic prostate cancer, prior androgen therapy)
-Answer: POSSIBLE | matches prostate cancer in a man, but BRCA status not stated
+Trial: Olaparib in BRCA-Mutated Metastatic Prostate Cancer (Eligibility: men with BRCA mutation, metastatic prostate cancer)
+Answer: LIKELY | matches prostate cancer in a man; BRCA status can be verified
 
 Patient: "62-year-old man with prostate cancer"
 Trial: Trastuzumab in HER2+ Breast Cancer (Eligibility: adult women with HER2+ breast cancer)
 Answer: UNLIKELY | trial is for breast cancer in women; patient has prostate cancer
 
 Patient: "62-year-old man with prostate cancer"
-Trial: Exercise Intervention for Prostate Cancer Survivors (Eligibility: adult men with any-stage prostate cancer history)
-Answer: LIKELY | adult man with prostate cancer history matches the inclusion criteria
+Trial: GLP-1 Agonist for Type 2 Diabetes (Eligibility: adults 18-75 with T2DM)
+Answer: UNLIKELY | trial is for type 2 diabetes; patient has prostate cancer
 
 Now classify:
 
@@ -331,18 +331,34 @@ Answer (one line, format exactly "<LABEL> | <one short reason>"):`
 
 const DEFAULT_USER_DESC = "I'm 58 years old with breast cancer in Boston"
 
+// Parser still accepts POSSIBLE in case the model emits it (older prompts,
+// instruction drift) — POSSIBLE is normalized to LIKELY since the binary
+// product question is "show or hide".
 function parseVerdict(raw) {
   if (!raw || typeof raw !== 'string') return { verdict: 'PARSE_FAIL', reason: '(empty output)' }
   const m = raw.match(/^\s*(LIKELY|POSSIBLE|UNLIKELY)\s*[|:\-—]\s*(.+?)\s*$/im)
-  if (m) return { verdict: m[1].toUpperCase(), reason: m[2].trim() }
+  if (m) {
+    const v = m[1].toUpperCase()
+    return { verdict: v === 'POSSIBLE' ? 'LIKELY' : v, reason: m[2].trim() }
+  }
   const w = raw.match(/\b(LIKELY|POSSIBLE|UNLIKELY)\b/i)
   if (w) {
+    const v = w[1].toUpperCase()
     return {
-      verdict: w[1].toUpperCase(),
+      verdict: v === 'POSSIBLE' ? 'LIKELY' : v,
       reason: raw.replace(w[0], '').replace(/^[\s|:\-—]+/, '').trim() || '(no reason)',
     }
   }
   return { verdict: 'PARSE_FAIL', reason: raw.slice(0, 120) }
+}
+
+// Normalize fixture-side expected values for binary agreement: POSSIBLE
+// counts as LIKELY (both = "show this trial"). Keeps the fixture data
+// informationally rich (3-class) while letting the binary model output
+// be evaluated correctly.
+function expectedBinary(expected) {
+  if (expected === 'POSSIBLE') return 'LIKELY'
+  return expected
 }
 
 const VERDICT_STYLES = {
@@ -472,7 +488,7 @@ export default function ClassificationHarness() {
   const parseRate = done.length ? Math.round(((done.length - parseFails) / done.length) * 100) : 0
   const elapsed = startT ? ((performance.now() - startT) / 1000).toFixed(1) : '0.0'
   const withExpected = done.filter(r => r.trial.expected)
-  const matches = withExpected.filter(r => r.verdict === r.trial.expected).length
+  const matches = withExpected.filter(r => r.verdict === expectedBinary(r.trial.expected)).length
   const agreementPct = withExpected.length ? Math.round((matches / withExpected.length) * 100) : null
 
   const canRun = status === 'ready' && !running
@@ -687,7 +703,8 @@ function buildMarkdownReport({ userDesc, promptTemplate, eligMax, modelLabel, re
     if (r.status !== 'DONE') continue
     const v = r.verdict || 'PARSE_FAIL'
     const exp = r.trial.expected || '—'
-    const match = r.trial.expected ? (r.verdict === r.trial.expected ? '✓' : '✗') : ''
+    const expBinary = r.trial.expected ? (r.trial.expected === 'POSSIBLE' ? 'LIKELY' : r.trial.expected) : null
+    const match = expBinary ? (r.verdict === expBinary ? '✓' : '✗') : ''
     const latency = r.latencyMs != null ? `${Math.round(r.latencyMs)}ms` : '—'
     const reasonOrRaw = r.reason && r.reason !== '(no reason)' ? r.reason : `raw: ${r.raw || '—'}`
     lines.push(`| ${truncate(r.trial.title || r.trial.briefTitle || r.trial.nctId, 80)} | ${escape(r.trial.nctId || '')} | ${v} | ${exp} | ${match} | ${latency} | ${truncate(reasonOrRaw, 140)} |`)
@@ -728,9 +745,12 @@ function ResultsTable({ rows }) {
       <tbody>
         {rows.map((r, i) => {
           const verdict = r.status === 'PENDING' ? 'PENDING' : (r.verdict || 'PARSE_FAIL')
-          const expected = r.trial.expected || '—'
-          const match = r.verdict && r.trial.expected
-            ? (r.verdict === r.trial.expected ? '✓' : '✗')
+          const rawExpected = r.trial.expected
+          // Display: keep original 3-class label so the fixture still reads
+          // informationally; ✓/✗ uses binary mapping (POSSIBLE counts as LIKELY).
+          const expected = rawExpected || '—'
+          const match = r.verdict && rawExpected
+            ? (r.verdict === expectedBinary(rawExpected) ? '✓' : '✗')
             : ''
           const matchColor = match === '✓' ? 'text-signal-good' : match === '✗' ? 'text-signal-bad' : 'text-parchment-500'
           return (
