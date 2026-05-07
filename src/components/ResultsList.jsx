@@ -215,9 +215,12 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
     if (!selected) return
     if (!classifyDone) return
     simplifier.enqueueSummarize(selected, { outputLanguage })
-    if (extractedFields) {
-      simplifier.enqueueAssessFit(selected, { outputLanguage })
-    }
+    // assess_fit ("Why this might or might not fit you") intentionally not
+    // enqueued — Gemma 2B's accuracy on the fit narrative isn't reliable
+    // enough to ship (it occasionally flips disease stage / treatment
+    // history). The classifier's binary verdict + dot is the safer signal.
+    // The assess_fit pipeline itself stays in useSimplifier in case we
+    // re-enable it on a fine-tuned model later.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.nctId, simplificationSupported, outputLanguage, classifyDone])
 
@@ -267,7 +270,7 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
   function handleRequestSimplify(trial) {
     if (!simplificationSupported) return
     simplifier.enqueueSummarize(trial, { outputLanguage })
-    if (extractedFields) simplifier.enqueueAssessFit(trial, { outputLanguage })
+    // assess_fit deliberately omitted — see selected-trial effect above.
   }
 
   function renderDetail(trial) {

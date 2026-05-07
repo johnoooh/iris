@@ -171,16 +171,11 @@ export default function ResultCard({
             </div>
           )}
 
-          {showFit && (
-            <div className={pane ? 'mb-4' : ''}>
-              <SectionLabel pane={pane}>Why this might or might not fit you</SectionLabel>
-              <p className={pane
-                ? 'text-[15px] text-parchment-900 leading-[1.6] whitespace-pre-wrap'
-                : 'text-sm text-parchment-900 leading-relaxed mb-3 whitespace-pre-wrap'}>
-                {fitState.text}
-              </p>
-            </div>
-          )}
+          {/* "Why this might or might not fit you" intentionally omitted —
+              Gemma 2B's accuracy on the fit narrative isn't reliable
+              enough to ship. The TriageRow fit dot (driven by the
+              classifier) is the safer signal. The DoctorDisclaimer
+              below renders unconditionally to set expectations. */}
 
           {(sumState.status === 'queued' || sumState.status === 'streaming') && (
             <p className="font-mono text-[11px] text-parchment-700 italic mb-2">
@@ -260,8 +255,19 @@ export default function ResultCard({
         </p>
       )}
 
+      {pane && (
+        <div className="mt-6 mb-2 px-4 py-3 rounded-lg bg-iris-50 border border-iris-100">
+          <p className="text-[13px] text-parchment-900 leading-relaxed">
+            <strong className="font-semibold text-iris-700">Talk to your oncologist</strong> if you
+            think you might qualify for this trial. The plain-language summary above is generated
+            on-device by a small AI model — it can miss or misstate eligibility details. Your care
+            team can confirm whether the trial fits your specific situation.
+          </p>
+        </div>
+      )}
+
       {pane ? (
-        <div className="mt-6 pt-5 border-t border-parchment-200 flex flex-col gap-1.5 text-[13px]">
+        <div className="mt-4 pt-5 border-t border-parchment-200 flex flex-col gap-1.5 text-[13px]">
           <div className="font-mono text-[11px] text-parchment-700 mb-1">contact</div>
           {trial.contact.phone && (
             <span className="text-parchment-900">{trial.contact.phone}</span>
