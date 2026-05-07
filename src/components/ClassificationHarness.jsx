@@ -402,6 +402,8 @@ export default function ClassificationHarness() {
   const [trialsJson, setTrialsJson] = useState(JSON.stringify(SAMPLE_TRIALS, null, 2))
   const [concurrency, setConcurrency] = useState(3)
   const [eligMax, setEligMax] = useState(1500)
+  const [translateFirst, setTranslateFirst] = useState(false)
+  const [translatedDesc, setTranslatedDesc] = useState(null)
   const [results, setResults] = useState([])
   const [running, setRunning] = useState(false)
   const [startT, setStartT] = useState(0)
@@ -433,6 +435,28 @@ export default function ClassificationHarness() {
     setStartT(performance.now())
     const initial = trials.map(trial => ({ trial, status: 'PENDING' }))
     setResults(initial)
+    setTranslatedDesc(null)
+
+    // Translate user description to English once before classification, so the
+    // model anchors on a single language at inference time. Runs only once per
+    // batch — amortized cost across all N trials.
+    let effectiveUserDesc = userDesc
+    if (translateFirst) {
+      const translatePrompt = `Translate the following patient description into clear, clinical English. Preserve all medical and demographic facts (age, sex, condition, treatments, location). Do not add or remove information. Output ONLY the English translation, nothing else.
+
+Patient description: ${userDesc}
+
+English translation:`
+      try {
+        const { raw } = await classifyOne(translatePrompt)
+        effectiveUserDesc = (raw || '').trim().replace(/^["']|["']$/g, '')
+        setTranslatedDesc(effectiveUserDesc)
+      } catch (e) {
+        alert('Translation failed: ' + (e?.message ?? 'unknown error'))
+        setRunning(false)
+        return
+      }
+    }
 
     const queue = trials.map((trial, idx) => ({ idx, trial }))
     const workersN = Math.min(concurrency, trials.length)
@@ -442,7 +466,7 @@ export default function ClassificationHarness() {
         const { idx, trial } = queue.shift()
         const elig = (trial.eligibility || '').slice(0, eligMax)
         const prompt = promptTemplate
-          .replace('{{user}}', userDesc)
+          .replace('{{user}}', effectiveUserDesc)
           .replace('{{title}}', trial.title || trial.briefTitle || '')
           .replace('{{eligibility}}', elig)
         try {
@@ -639,6 +663,19 @@ export default function ClassificationHarness() {
             <span className="font-mono text-[10px] uppercase tracking-[0.04em]">execution</span>
             serial (engine constraint)
           </span>
+          <label
+            className="inline-flex items-center gap-1.5 text-[12px] text-parchment-900 cursor-pointer"
+            title="Translate the patient description to English once before classification. Runs only once per batch — adds ~1s amortized."
+          >
+            <input
+              type="checkbox"
+              checked={translateFirst}
+              onChange={e => setTranslateFirst(e.target.checked)}
+              disabled={running}
+              className="accent-iris-500"
+            />
+            translate to English first
+          </label>
           <label className="inline-flex items-center gap-2 text-[12px] text-parchment-700">
             Eligibility max chars
             <input
@@ -653,6 +690,13 @@ export default function ClassificationHarness() {
             />
           </label>
         </div>
+
+        {translatedDesc && (
+          <div className="mt-3 px-3 py-2.5 bg-iris-50 border border-iris-100 rounded-lg text-[12px] text-parchment-900 leading-relaxed">
+            <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-iris-700 mr-2">translated</span>
+            {translatedDesc}
+          </div>
+        )}
 
         {(running || done.length > 0) && (
           <div className="flex flex-wrap items-center gap-4 font-mono text-[11px] text-parchment-700 mt-3">
