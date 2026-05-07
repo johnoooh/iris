@@ -300,24 +300,34 @@ Exclusion Criteria:
   },
 ]
 
-const DEFAULT_PROMPT = `Decide whether to show this clinical trial to the user. The user description is the ONLY thing you know about them — do not assume any subtype, biomarker, stage, treatment history, or comorbidity that the user did not state.
+const DEFAULT_PROMPT = `You decide whether to show a clinical trial to a patient based on the patient's short self-description. Be conservative: the patient only told you what they explicitly stated — do not assume HER2/HR/BRCA status, stage, prior treatment, or other facts.
 
-Apply these rules in order:
-1. If the trial studies a condition the user does NOT have → UNLIKELY
-2. If the trial's stated demographic requirements (sex, age range) exclude the user → UNLIKELY
-3. If the trial requires a subtype, biomarker, stage, mutation, or prior treatment the user did not mention → POSSIBLE (the user might still qualify; we just don't know)
-4. If the user clearly meets every stated requirement → LIKELY
-5. Otherwise → POSSIBLE
+Use these labels:
+- LIKELY: the trial's primary indication matches the patient's condition AND the patient meets every demographic requirement.
+- POSSIBLE: the trial's indication matches but at least one criterion (subtype, biomarker, stage, mutation, prior therapy) is unstated by the patient.
+- UNLIKELY: the trial is for a different disease, or the patient is the wrong sex/age.
 
-Do NOT mark UNLIKELY just because the trial has many requirements. UNLIKELY means the user is clearly disqualified, not that information is missing.
+Examples:
 
-User: {{user}}
-Trial title: {{title}}
+Patient: "62-year-old man with prostate cancer"
+Trial: Phase III Olaparib in BRCA-Mutated Metastatic Prostate Cancer (Eligibility: men with BRCA mutation, metastatic prostate cancer, prior androgen therapy)
+Answer: POSSIBLE | matches prostate cancer in a man, but BRCA status not stated
+
+Patient: "62-year-old man with prostate cancer"
+Trial: Trastuzumab in HER2+ Breast Cancer (Eligibility: adult women with HER2+ breast cancer)
+Answer: UNLIKELY | trial is for breast cancer in women; patient has prostate cancer
+
+Patient: "62-year-old man with prostate cancer"
+Trial: Exercise Intervention for Prostate Cancer Survivors (Eligibility: adult men with any-stage prostate cancer history)
+Answer: LIKELY | adult man with prostate cancer history matches the inclusion criteria
+
+Now classify:
+
+Patient: {{user}}
+Trial: {{title}}
 Eligibility: {{eligibility}}
 
-Reply on EXACTLY one line:
-VERDICT | one-sentence reason
-VERDICT is LIKELY, POSSIBLE, or UNLIKELY.`
+Answer (one line, format exactly "<LABEL> | <one short reason>"):`
 
 const DEFAULT_USER_DESC = "I'm 58 years old with breast cancer in Boston"
 
