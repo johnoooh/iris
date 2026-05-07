@@ -119,11 +119,12 @@ export default function ResultCard({
     : 'bg-white border border-parchment-400 rounded-lg p-5 mb-3 max-w-3xl'
 
   const sumState = simplification?.summarize
-  const fitState = simplification?.fit
-
+  // fitState/showFit removed when the "Why this might or might not fit you"
+  // section was dropped — Gemma 2B's accuracy on the fit narrative wasn't
+  // reliable enough to ship. Re-introduce both if the fit section comes
+  // back behind a fine-tuned model.
   const showPlainLanguage = sumState && sumState.status !== 'error'
   const showFallbackHint = sumState?.status === 'error'
-  const showFit = fitState && fitState.status !== 'error' && fitState.text
 
   return (
     <article className={wrapperClass}>

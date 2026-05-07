@@ -33,7 +33,11 @@ export default function ClassificationHarness() {
   const [userDesc, setUserDesc] = useState(USER_PRESETS[0].text)
   const [promptTemplate, setPromptTemplate] = useState(DEFAULT_CLASSIFY_PROMPT)
   const [trialsJson, setTrialsJson] = useState(JSON.stringify(SAMPLE_TRIALS, null, 2))
-  const [concurrency, setConcurrency] = useState(3)
+  // Concurrency was a UI dropdown until we serialized at the hook level
+  // (WebLLM engine is single-threaded). Kept as a constant so the worker
+  // loop still controls fan-out at the harness level — the real
+  // serialization happens in useClassifier's promise chain.
+  const concurrency = 3
   const [eligMax, setEligMax] = useState(1500)
   const [translateFirst, setTranslateFirst] = useState(false)
   const [translatedDesc, setTranslatedDesc] = useState(null)

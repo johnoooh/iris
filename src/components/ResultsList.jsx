@@ -72,7 +72,13 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
     extractedFields,
   })
 
-  const allTrials = data?.pages.flatMap(p => p.trials) ?? []
+  // Memoized so effect dep arrays comparing against allTrials don't churn
+  // every render — react-query returns the same `data` ref while data is
+  // unchanged, so memo identity is stable across non-data renders.
+  const allTrials = useMemo(
+    () => data?.pages.flatMap(p => p.trials) ?? [],
+    [data]
+  )
 
   const isMobile = useIsMobile()
   const [selectedNctId, setSelectedNctId] = useState(null)

@@ -70,7 +70,13 @@ export function useClassifier() {
     return next
   }
 
+  // runTask only closes over refs (pendingRef, chainRef, taskIdRef, detachRef)
+  // which are stable across renders, so it's safe to omit from useCallback
+  // deps. The exhaustive-deps lint can't see through this because runTask
+  // is defined in the function body each render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const classifyOne = useCallback((prompt) => runTask('classify', 'classify', prompt), [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const translateOne = useCallback((prompt) => runTask('translate', 'translate', prompt), [])
 
   return { classifyOne, translateOne }
