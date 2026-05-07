@@ -143,8 +143,9 @@ export default function CompareView({ compareSet, pinnedTrials, onBack, onRemove
           </p>
         ) : (
           <>
-            {/* Screen view: table on desktop, stacked cards on mobile */}
-            <div className="no-print-only">
+            {/* Screen view: table on desktop, stacked cards on mobile.
+                no-print hides this so PrintCompare below takes over. */}
+            <div className="no-print">
               <CompareTable trials={trials} onRemove={onRemove} />
             </div>
             {/* Print view: a one-line index page + one full trial per page */}
