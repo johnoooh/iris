@@ -205,7 +205,12 @@ export function useSimplifier({ modelKey, userDescription, extractedFields }) {
   }, [])
 
   useEffect(() => {
-    return () => { detachRef.current?.() }
+    return () => {
+      // Same StrictMode-safe pattern as useNLP: null the ref so the next
+      // mount re-attaches via ensureSubscribed.
+      detachRef.current?.()
+      detachRef.current = null
+    }
   }, [])
 
   return { states, enqueueSummarize, enqueueAssessFit, cancelPending, resetCache }

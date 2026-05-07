@@ -78,8 +78,6 @@ export default function NaturalLanguageInput({ onExtract, embedded = false }) {
     e.preventDefault()
     if (!text.trim()) return
     if (status !== 'ready') {
-      // Model still downloading (or in some other transient state) — queue
-      // the submit so it auto-fires when ready.
       setPendingSubmit(true)
       return
     }
