@@ -109,13 +109,18 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
   const canClassify = consented && nlp.webGPUSupported && Boolean(patientDesc)
 
   // Idempotent: worker fast-returns 'ready' if engine already loaded
-  // (e.g. NL extraction loaded it earlier this session).
+  // (e.g. NL extraction loaded it earlier this session). Destructure
+  // load() out of nlp so we can list it in deps directly — `nlp` itself
+  // is a fresh object on every render (useNLP doesn't memoize its
+  // return), and listing the whole hook would re-fire the effect on
+  // every render even when nothing relevant changed.
+  const nlpLoad = nlp.load
   useEffect(() => {
     if (!canClassify) return
     if (nlp.status !== 'idle') return
     const model = NLP_MODELS[modelKey] ?? NLP_MODELS.gemma
-    nlp.load(model.id, { isThinking: model.isThinking, chatOpts: model.chatOpts })
-  }, [canClassify, nlp.status, modelKey, nlp])
+    nlpLoad(model.id, { isThinking: model.isThinking, chatOpts: model.chatOpts })
+  }, [canClassify, nlp.status, modelKey, nlpLoad])
 
   // Reset classification state when EITHER the search params OR the patient
   // description changes. Including patientDesc handles the case where a user

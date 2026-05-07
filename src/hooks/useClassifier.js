@@ -35,9 +35,19 @@ export function useClassifier() {
   }
 
   useEffect(() => {
+    const pending = pendingRef.current
     return () => {
       detachRef.current?.()
       detachRef.current = null
+      // Reject every in-flight classify so awaiting callers don't hang
+      // forever when the component unmounts mid-batch (or during a
+      // StrictMode dev double-invoke). Without this, the listener
+      // detaches but the pendingRef Map still holds resolve/reject
+      // handles whose promise will never settle.
+      for (const { reject } of pending.values()) {
+        reject(new Error('classifier unmounted'))
+      }
+      pending.clear()
     }
   }, [])
 
