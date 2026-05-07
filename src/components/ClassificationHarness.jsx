@@ -763,6 +763,10 @@ function buildMarkdownReport({ userDesc, promptTemplate, eligMax, modelLabel, re
   lines.push('')
   lines.push(`**Model:** ${modelLabel}`)
   lines.push(`**User description:** ${userDesc}`)
+  lines.push(`**Translate-first:** ${translateFirst ? 'ON' : 'off'}`)
+  if (translatedDesc) {
+    lines.push(`**Translated to:** ${translatedDesc}`)
+  }
   lines.push(`**Eligibility max chars:** ${eligMax}`)
   lines.push('')
   lines.push('## Stats')
