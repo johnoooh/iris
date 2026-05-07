@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>IRIS — redesign explorations</title>
+<link rel="stylesheet" href="styles/tokens.css" />
+<style>
+  html, body { margin: 0; height: 100%; }
+  body { font-family: 'Inter Tight', system-ui, sans-serif; background: #f0eee9; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="shared/iris-shared.jsx"></script>
+<script type="text/babel" src="variations/editorial.jsx"></script>
+<script type="text/babel" src="variations/triage.jsx"></script>
+<script type="text/babel" src="variations/dossier.jsx"></script>
+<script type="text/babel" src="variations/mobile-triage.jsx"></script>
+<script type="text/babel" src="variations/mobile-dossier.jsx"></script>
+<script type="text/babel" src="variations/shimmer-showcase.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+function Note({ children }) {
+  return (
+    <div style={{
+      fontSize: 12, color: 'rgba(60,50,40,0.75)', lineHeight: 1.55,
+      maxWidth: 720, marginBottom: 8,
+    }}>{children}</div>
+  );
+}
+
+function App() {
+  return (
+    <DesignCanvas
+      title="IRIS — redesign explorations"
+      subtitle="Three results-layout directions on an evolved warm-parchment system. Same data, same streaming-AI behavior, different scanning models."
+    >
+      <DCSection
+        id="system"
+        title="Design system shifts"
+        subtitle="What's the same, what's evolved"
+      >
+        <DCArtboard id="legend" label="System notes" width={520} height={760}>
+          <div style={{ padding: '24px 26px', fontFamily: 'Inter Tight, sans-serif', fontSize: 13, lineHeight: 1.55, color: 'var(--p-900)', background: 'var(--p-50)', height: '100%', overflow: 'auto' }}>
+            <h2 style={{ fontFamily: 'Source Serif 4, serif', fontSize: 22, margin: '0 0 4px', color: 'var(--p-950)', letterSpacing: '-0.01em' }}>What I changed</h2>
+            <p style={{ color: 'var(--p-700)', margin: '0 0 18px', fontSize: 12.5 }}>Same warm parchment soul. Sharper hierarchy, an iris-violet accent, and a built-in scanning aid (the fit meter).</p>
+
+            <h4 style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--iris-700)', margin: '0 0 8px' }}>Type</h4>
+            <p style={{ margin: '0 0 4px' }}>
+              <span style={{ fontFamily: 'Source Serif 4, serif', fontSize: 22, fontWeight: 600 }}>Source Serif 4</span>
+              <span style={{ color: 'var(--p-700)', fontSize: 12, marginLeft: 8 }}>headlines &amp; trial titles</span>
+            </p>
+            <p style={{ margin: '0 0 4px' }}>
+              <span style={{ fontFamily: 'Inter Tight, sans-serif', fontSize: 16, fontWeight: 500 }}>Inter Tight</span>
+              <span style={{ color: 'var(--p-700)', fontSize: 12, marginLeft: 8 }}>UI &amp; body</span>
+            </p>
+            <p style={{ margin: '0 0 18px' }}>
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>JetBrains Mono</span>
+              <span style={{ color: 'var(--p-700)', fontSize: 12, marginLeft: 8 }}>technical labels (echoes the privacy/local-AI ethos)</span>
+            </p>
+
+            <h4 style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--iris-700)', margin: '0 0 8px' }}>Color</h4>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+              {['var(--p-50)','var(--p-100)','var(--p-200)','var(--p-300)','var(--p-500)','var(--p-700)','var(--p-900)','var(--p-950)'].map(c => (
+                <div key={c} style={{ width: 36, height: 36, background: c, borderRadius: 4, border: '1px solid rgba(0,0,0,0.05)' }} />
+              ))}
+            </div>
+            <p style={{ margin: '0 0 12px', color: 'var(--p-700)', fontSize: 11 }}>parchment — kept &amp; lightly retuned</p>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+              {['var(--iris-50)','var(--iris-100)','var(--iris-300)','var(--iris-500)','var(--iris-700)','var(--iris-900)'].map(c => (
+                <div key={c} style={{ width: 36, height: 36, background: c, borderRadius: 4, border: '1px solid rgba(0,0,0,0.05)' }} />
+              ))}
+            </div>
+            <p style={{ margin: '0 0 18px', color: 'var(--p-700)', fontSize: 11 }}>iris — new, named for the namesake. CTA + AI accent.</p>
+
+            <h4 style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--iris-700)', margin: '0 0 8px' }}>New patterns</h4>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              <li><b>Fit meter</b> — visualizes how the user's described situation maps to eligibility. Three states: likely / may / unclear.</li>
+              <li><b>Streaming shimmer</b> — AI summary placeholders shimmer until tokens arrive, then fade in. Honest about latency.</li>
+              <li><b>Local-AI badge</b> — mono-set, always visible. Pulse dot when the model is working.</li>
+              <li><b>Unified search</b> — NL and structured form become one input with a mode toggle, not two stacked sections.</li>
+              <li><b>Compare</b> — pin up to 3 trials. Shared toolbar pill across variations.</li>
+              <li><b>Share / Save / Print</b> on every card. Save is session-only, no PII persisted.</li>
+            </ul>
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection
+        id="results"
+        title="Results layout — three directions"
+        subtitle="The primary concern was scanability. Each variation answers it differently."
+      >
+        <DCArtboard id="editorial" label="A · Editorial list" width={920} height={900}>
+          <EditorialVariation />
+        </DCArtboard>
+        <DCArtboard id="triage" label="B · Triage two-pane" width={1180} height={900}>
+          <TriageVariation />
+        </DCArtboard>
+        <DCArtboard id="dossier" label="C · Dossier grid" width={1100} height={900}>
+          <DossierVariation />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection
+        id="mobile"
+        title="Mobile views — rebuilt for the form factor"
+        subtitle="Editorial works as-is on phone (single-column already). Triage and Dossier needed mobile-native rethinks: triage → tap-to-sheet, dossier → filter chips + collapsible cards. Sticky compare bar for both."
+      >
+        <DCArtboard id="editorial-m" label="A · Editorial (mobile) — direct port" width={390} height={760}>
+          <EditorialVariation />
+        </DCArtboard>
+        <DCArtboard id="triage-m" label="B · Triage (mobile) — list + bottom sheet" width={390} height={760}>
+          <MobileTriageVariation />
+        </DCArtboard>
+        <DCArtboard id="dossier-m" label="C · Dossier (mobile) — filter chips + collapsible" width={390} height={760}>
+          <MobileDossierVariation />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection
+        id="shimmer"
+        title="AI streaming — what loading looks like"
+        subtitle="The local model evaluates trials serially, which takes time. Toggle between Queued and In-progress to see how the wait reads."
+      >
+        <DCArtboard id="shimmer" label="AI streaming states" width={760} height={900}>
+          <ShimmerShowcase />
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

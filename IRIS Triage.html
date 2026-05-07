@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>IRIS — Triage prototype</title>
+<link rel="stylesheet" href="styles/tokens.css" />
+<style>
+  html, body { margin: 0; height: 100%; background: var(--p-50); }
+  body { font-family: var(--sans); color: var(--p-900); }
+
+  /* App-level layout */
+  .app {
+    height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+    background: var(--p-50);
+  }
+
+  /* Mobile breakpoint switch */
+  @media (max-width: 820px) {
+    .triage-cols { grid-template-columns: 1fr !important; }
+    .triage-detail-pane { display: none !important; }
+    .triage-list-pane { border-right: none !important; }
+    .iris-search-detail { display: none !important; }
+  }
+
+  /* Sheet animation */
+  @keyframes iris-sheet-in {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
+  .iris-sheet { animation: iris-sheet-in 280ms cubic-bezier(.2,.8,.2,1); }
+
+  /* Print */
+  @media print {
+    .no-print { display: none !important; }
+    .triage-detail-pane { overflow: visible !important; }
+  }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="shared/iris-shared.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo } = React;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accent": "iris",
+  "density": "comfy",
+  "showFitMeter": true,
+  "showLocalAIBadge": true,
+  "summaryStyle": "bullets",
+  "listWidth": 400
+}/*EDITMODE-END*/;
+
+const ACCENT_MAP = {
+  iris:    { 50: 'oklch(0.96 0.015 290)', 100: 'oklch(0.92 0.03 290)', 300: 'oklch(0.78 0.06 290)', 500: 'oklch(0.55 0.10 290)', 600: 'oklch(0.46 0.10 290)', 700: 'oklch(0.38 0.08 290)' },
+  moss:    { 50: 'oklch(0.96 0.02 145)',  100: 'oklch(0.92 0.04 145)', 300: 'oklch(0.74 0.07 145)', 500: 'oklch(0.50 0.09 145)', 600: 'oklch(0.42 0.09 145)', 700: 'oklch(0.34 0.07 145)' },
+  rust:    { 50: 'oklch(0.96 0.02 40)',   100: 'oklch(0.92 0.04 40)',  300: 'oklch(0.74 0.10 40)',  500: 'oklch(0.55 0.13 40)',  600: 'oklch(0.46 0.13 40)',  700: 'oklch(0.38 0.10 40)' },
+  ink:     { 50: 'oklch(0.96 0.005 250)', 100: 'oklch(0.92 0.01 250)', 300: 'oklch(0.74 0.02 250)', 500: 'oklch(0.42 0.03 250)', 600: 'oklch(0.32 0.03 250)', 700: 'oklch(0.24 0.02 250)' },
+};
+
+function applyAccent(name) {
+  const a = ACCENT_MAP[name] || ACCENT_MAP.iris;
+  const r = document.documentElement.style;
+  r.setProperty('--iris-50',  a[50]);
+  r.setProperty('--iris-100', a[100]);
+  r.setProperty('--iris-300', a[300]);
+  r.setProperty('--iris-500', a[500]);
+  r.setProperty('--iris-600', a[600]);
+  r.setProperty('--iris-700', a[700]);
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Triage row
+function TriageRow({ trial, selected, comparing, onSelect, onToggleCompare, density, showFit }) {
+  const padY = density === 'compact' ? 10 : density === 'comfy' ? 18 : 14;
+  return (
+    <button
+      onClick={onSelect}
+      style={{
+        textAlign: 'left', width: '100%',
+        background: selected ? 'white' : 'transparent',
+        border: 'none',
+        borderLeft: selected ? '3px solid var(--iris-500)' : '3px solid transparent',
+        padding: `${padY}px 16px ${padY}px 14px`,
+        cursor: 'pointer',
+        display: 'flex', flexDirection: 'column', gap: 6,
+        boxShadow: selected ? 'var(--shadow-sm)' : 'none',
+        position: 'relative', transition: 'background 120ms',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+        <span style={{
+          fontFamily: 'var(--serif)', fontSize: 14.5, fontWeight: 600,
+          color: 'var(--p-950)', lineHeight: 1.3,
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+        }}>{trial.title}</span>
+        <span
+          onClick={e => { e.stopPropagation(); onToggleCompare(); }}
+          style={{
+            flexShrink: 0, width: 18, height: 18, borderRadius: 4,
+            border: '1.5px solid', borderColor: comparing ? 'var(--iris-500)' : 'var(--p-400)',
+            background: comparing ? 'var(--iris-500)' : 'transparent',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+          }}
+          title={comparing ? 'Remove from compare' : 'Add to compare'}
+        >
+          {comparing && (
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+              <path d="M2.5 6.5l2.5 2.5L9.5 4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        {showFit && <FitMeter fit={trial.fit} size="sm" />}
+        <span style={{ fontSize: 11, color: 'var(--p-700)', fontFamily: 'var(--mono)' }}>
+          {trial.distanceMi} mi · {trial.phase}
+        </span>
+      </div>
+    </button>
+  );
+}
+
+// Detail pane (desktop) / sheet body (mobile)
+function TriageDetail({ trial, showFit }) {
+  const sim = useStreamedSimplification(trial);
+  return (
+    <div style={{ padding: '24px 28px 32px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 6 }}>
+        <StatusPill status={trial.status} />
+        <ActionRow simple />
+      </div>
+      <h2 style={{
+        fontFamily: 'var(--serif)', fontSize: 24, fontWeight: 600,
+        color: 'var(--p-950)', lineHeight: 1.2, letterSpacing: '-0.01em',
+        margin: '12px 0 8px',
+      }}>{trial.title}</h2>
+
+      <div style={{
+        fontSize: 12, color: 'var(--p-700)', fontFamily: 'var(--mono)',
+        display: 'flex', flexWrap: 'wrap', gap: '4px 14px', marginBottom: 18,
+      }}>
+        <span>{trial.phase}</span>
+        <span style={{ color: 'var(--p-300)' }}>·</span>
+        <span>{trial.facility}, {trial.city}</span>
+        <span style={{ color: 'var(--p-300)' }}>·</span>
+        <span>{trial.distanceMi} mi away</span>
+      </div>
+
+      {showFit && (
+        <div style={{
+          background: 'linear-gradient(180deg, var(--iris-50), white)',
+          border: '1px solid var(--iris-100)',
+          borderRadius: 12, padding: '16px 18px', marginBottom: 22,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <FitMeter fit={trial.fit} />
+            <span style={{ fontSize: 11, color: 'var(--iris-700)', fontFamily: 'var(--mono)' }}>
+              based on what you described
+            </span>
+          </div>
+          <p style={{ margin: 0, fontSize: 14, color: 'var(--p-900)', lineHeight: 1.55 }}>
+            <StreamingText value={sim.plain.fitNote} status={sim.status} />
+          </p>
+        </div>
+      )}
+
+      {[
+        { label: 'What this study is testing', value: sim.plain.summary },
+        { label: 'Who can join', value: sim.plain.eligibility },
+      ].map(section => (
+        <div key={section.label} style={{ marginBottom: 18 }}>
+          <h4 style={{
+            fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 600,
+            textTransform: 'uppercase', letterSpacing: '0.08em',
+            color: 'var(--p-700)', margin: '0 0 8px 0',
+          }}>{section.label}</h4>
+          <p style={{ fontSize: 15, lineHeight: 1.6, color: 'var(--p-900)', margin: 0 }}>
+            <StreamingText value={section.value} status={sim.status} placeholderLines={3} />
+          </p>
+        </div>
+      ))}
+
+      <div style={{
+        marginTop: 22, paddingTop: 18, borderTop: '1px solid var(--p-200)',
+        display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13,
+      }}>
+        <div style={{ color: 'var(--p-700)', fontFamily: 'var(--mono)', fontSize: 11, marginBottom: 4 }}>
+          contact
+        </div>
+        <span style={{ color: 'var(--p-900)' }}>{trial.contact.phone}</span>
+        <a href={`mailto:${trial.contact.email}`} style={{ color: 'var(--iris-700)' }}>{trial.contact.email}</a>
+        <a href={trial.ctGovUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--iris-700)', marginTop: 8, fontWeight: 500 }}>
+          View on ClinicalTrials.gov →
+        </a>
+      </div>
+    </div>
+  );
+}
+
+// Mobile bottom sheet for selected trial
+function MobileSheet({ trial, onClose, showFit }) {
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(28, 24, 18, 0.45)',
+        display: 'flex', alignItems: 'flex-end', zIndex: 50,
+      }}
+    >
+      <div
+        className="iris-sheet"
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: 'white', width: '100%', height: '92%',
+          borderTopLeftRadius: 18, borderTopRightRadius: 18,
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        }}
+      >
+        <div style={{ padding: '10px 0 4px', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+          <span style={{ width: 38, height: 4, borderRadius: 999, background: 'var(--p-300)' }} />
+        </div>
+        <div style={{
+          padding: '4px 18px 10px', flexShrink: 0,
+          display: 'flex', justifyContent: 'flex-end',
+        }}>
+          <button onClick={onClose} style={{
+            background: 'transparent', border: 'none', cursor: 'pointer',
+            color: 'var(--p-700)', fontSize: 13, padding: 4,
+          }}>Close</button>
+        </div>
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <TriageDetail trial={trial} showFit={showFit} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  useEffect(() => { applyAccent(t.accent); }, [t.accent]);
+
+  const [selectedId, setSelectedId] = useState(MOCK_TRIALS[1].id);
+  const [compareSet, setCompareSet] = useState(new Set([MOCK_TRIALS[0].id]));
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 820);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  const selected = useMemo(
+    () => MOCK_TRIALS.find(x => x.id === selectedId) || MOCK_TRIALS[0],
+    [selectedId]
+  );
+
+  const toggleCompare = (id) => setCompareSet(s => {
+    const n = new Set(s);
+    if (n.has(id)) n.delete(id); else if (n.size < 3) n.add(id);
+    return n;
+  });
+
+  const onSelectTrial = (id) => {
+    setSelectedId(id);
+    if (isMobile) setSheetOpen(true);
+  };
+
+  return (
+    <div className="app">
+      <IrisHeader />
+
+      {/* Search bar — hide its detail on mobile via CSS, header still shown */}
+      <div className="iris-search-detail">
+        <IrisSearchBar dense />
+      </div>
+
+      {/* Mobile-only compact search summary chip */}
+      {isMobile && (
+        <div style={{
+          padding: '12px 14px', borderBottom: '1px solid var(--p-200)',
+          background: 'var(--p-50)',
+        }}>
+          <div style={{
+            background: 'white', border: '1px solid var(--p-300)', borderRadius: 10,
+            padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13,
+          }}>
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" style={{ color: 'var(--p-700)' }}>
+              <circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.5" />
+              <path d="m14 14 4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            <span style={{ color: 'var(--p-900)', flex: 1 }}>58yo · breast cancer · Boston</span>
+            <span style={{ fontSize: 11, color: 'var(--iris-700)' }}>edit</span>
+          </div>
+        </div>
+      )}
+
+      <ResultsToolbar
+        count={MOCK_TRIALS.length}
+        extra={compareSet.size > 0 && (
+          <button style={{
+            fontSize: 12, color: 'var(--iris-700)', background: 'var(--iris-50)',
+            border: '1px solid var(--iris-100)',
+            padding: '4px 12px', borderRadius: 999, cursor: 'pointer',
+            display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 500,
+          }}>
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="3" width="5" height="10" rx="1" stroke="currentColor" strokeWidth="1.3" />
+              <rect x="9" y="3" width="5" height="10" rx="1" stroke="currentColor" strokeWidth="1.3" />
+            </svg>
+            Compare {compareSet.size}
+          </button>
+        )}
+      />
+
+      {/* Two-pane (collapses to single column on mobile via CSS) */}
+      <div
+        className="triage-cols"
+        style={{
+          flex: 1, display: 'grid',
+          gridTemplateColumns: `${t.listWidth}px 1fr`,
+          overflow: 'hidden', minHeight: 0,
+        }}
+      >
+        <div
+          className="triage-list-pane"
+          style={{
+            borderRight: '1px solid var(--p-200)',
+            background: 'var(--p-100)',
+            overflow: 'auto', display: 'flex', flexDirection: 'column',
+          }}
+        >
+          {MOCK_TRIALS.map(trial => (
+            <div key={trial.id} style={{ borderBottom: '1px solid var(--p-200)' }}>
+              <TriageRow
+                trial={trial}
+                selected={!isMobile && trial.id === selectedId}
+                comparing={compareSet.has(trial.id)}
+                onSelect={() => onSelectTrial(trial.id)}
+                onToggleCompare={() => toggleCompare(trial.id)}
+                density={t.density}
+                showFit={t.showFitMeter}
+              />
+            </div>
+          ))}
+        </div>
+        <div
+          className="triage-detail-pane"
+          style={{ background: 'white', overflow: 'auto' }}
+        >
+          <TriageDetail trial={selected} showFit={t.showFitMeter} />
+        </div>
+      </div>
+
+      {/* Sticky compare bar on mobile */}
+      {isMobile && compareSet.size > 0 && (
+        <div className="no-print" style={{
+          background: 'white', borderTop: '1px solid var(--p-200)',
+          padding: '10px 14px',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          boxShadow: '0 -4px 16px rgba(28, 24, 18, 0.06)',
+        }}>
+          <span style={{ fontSize: 13, color: 'var(--p-900)' }}>
+            <b>{compareSet.size}</b> in compare
+          </span>
+          <button style={{
+            background: 'var(--iris-600)', color: 'white', border: 'none',
+            padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+            cursor: 'pointer',
+          }}>Compare →</button>
+        </div>
+      )}
+
+      {isMobile && sheetOpen && (
+        <MobileSheet trial={selected} onClose={() => setSheetOpen(false)} showFit={t.showFitMeter} />
+      )}
+
+      <TweaksPanel>
+        <TweakSection label="Visual" />
+        <TweakColor
+          label="Accent"
+          value={t.accent}
+          options={['iris', 'moss', 'rust', 'ink']}
+          renderSwatch={(name) => ACCENT_MAP[name][500]}
+          onChange={(v) => setTweak('accent', v)}
+        />
+        <TweakRadio
+          label="Density"
+          value={t.density}
+          options={['compact', 'regular', 'comfy']}
+          onChange={(v) => setTweak('density', v)}
+        />
+        <TweakSlider
+          label="List width"
+          value={t.listWidth} min={280} max={460} step={10} unit="px"
+          onChange={(v) => setTweak('listWidth', v)}
+        />
+        <TweakSection label="Features" />
+        <TweakToggle
+          label="Fit meter"
+          value={t.showFitMeter}
+          onChange={(v) => setTweak('showFitMeter', v)}
+        />
+        <TweakToggle
+          label="Local-AI badge"
+          value={t.showLocalAIBadge}
+          onChange={(v) => setTweak('showLocalAIBadge', v)}
+        />
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

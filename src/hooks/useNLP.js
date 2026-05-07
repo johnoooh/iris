@@ -15,7 +15,13 @@ export function useNLP() {
 
   useEffect(() => {
     return () => {
+      // Detach this instance's listener AND null the ref so the next mount
+      // re-subscribes. Without nulling, React StrictMode's dev-only
+      // mount→unmount→remount sequence would leave detachRef.current
+      // truthy and ensureSubscribed would skip re-attaching, dropping
+      // every message (including 'ready') from the second mount onward.
       detachRef.current?.()
+      detachRef.current = null
       // Worker is owned at module scope and may be in use by useSimplifier;
       // do NOT terminate on unmount. The shared worker preserves the loaded
       // model across NLP panel toggles.

@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel in-progress runs for the same ref so a force-push doesn't queue
+# stale CI.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          # vite.config.js conditionally emits --no-experimental-webstorage
+          # for Node >= 22, so CI must run Node 22 to match local dev.
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Lint currently fails on pre-existing errors in main (e.g. vite.config.js
+      # 'process' is not defined, useNLP exhaustive-deps warnings). Run as a
+      # non-blocking informational step until those are fixed in a follow-up;
+      # build + tests are the real merge gate.
+      - name: Lint (non-blocking)
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Test
+        run: npm run test:run
+
+      - name: Build
+        run: npm run build
+
+      # Upload the built dist/ as a workflow artifact so reviewers can
+      # download and serve it locally (e.g. `npx serve dist`) to verify the
+      # production bundle of the PR's exact code. Retention is short to
+      # avoid clutter; the artifact is for review-time only, not archival.
+      - name: Upload built site
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ github.event.pull_request.number || github.sha }}
+          path: dist/
+          retention-days: 7
+          if-no-files-found: error

@@ -26,7 +26,7 @@ describe('SearchForm', () => {
     const onSearch = vi.fn()
     render(<SearchForm onSearch={onSearch} />)
     await user.type(screen.getByLabelText(/condition/i), 'lung cancer')
-    fireEvent.click(screen.getByRole('button', { name: /search/i }))
+    fireEvent.click(screen.getByRole('button', { name: /find trials/i }))
     expect(onSearch).toHaveBeenCalledWith(
       expect.objectContaining({ condition: 'lung cancer' })
     )
@@ -35,7 +35,7 @@ describe('SearchForm', () => {
   it('does not submit when condition is empty', async () => {
     const onSearch = vi.fn()
     render(<SearchForm onSearch={onSearch} />)
-    fireEvent.click(screen.getByRole('button', { name: /search/i }))
+    fireEvent.click(screen.getByRole('button', { name: /find trials/i }))
     expect(onSearch).not.toHaveBeenCalled()
   })
 })
@@ -60,7 +60,7 @@ describe('SearchForm prefill', () => {
     const user = userEvent.setup()
     const onSearch = vi.fn()
     render(<SearchForm onSearch={onSearch} prefill={{ condition: 'breast cancer' }} />)
-    fireEvent.click(screen.getByRole('button', { name: /search/i }))
+    fireEvent.click(screen.getByRole('button', { name: /find trials/i }))
     expect(onSearch).toHaveBeenCalledWith(
       expect.objectContaining({ condition: 'breast cancer' })
     )

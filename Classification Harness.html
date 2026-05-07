@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>IRIS — classification test harness</title>
+<link rel="stylesheet" href="styles/tokens.css" />
+<style>
+  html, body { margin: 0; height: 100%; background: var(--p-50); color: var(--p-900); font-family: var(--sans); }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 28px 24px 80px; }
+  h1 { font-family: var(--serif); font-size: 28px; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 4px; }
+  .sub { color: var(--p-700); font-size: 13px; margin: 0 0 24px; max-width: 640px; line-height: 1.55; }
+  .panel { background: white; border: 1px solid var(--p-200); border-radius: 12px; padding: 18px 20px; margin-bottom: 18px; }
+  .panel h2 { font-family: var(--serif); font-size: 16px; margin: 0 0 12px; font-weight: 600; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .row { grid-template-columns: 1fr; } }
+  label { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--iris-700); display: block; margin-bottom: 6px; }
+  textarea, input, select { width: 100%; font-family: var(--sans); font-size: 13px; padding: 10px 12px; border: 1px solid var(--p-300); border-radius: 8px; background: var(--p-50); color: var(--p-900); resize: vertical; }
+  textarea { line-height: 1.5; }
+  .mono textarea { font-family: var(--mono); font-size: 12px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
+  button.run { background: var(--iris-600); color: white; border: none; padding: 10px 18px; font-size: 13px; font-weight: 600; border-radius: 8px; cursor: pointer; }
+  button.run:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.ghost { background: transparent; border: 1px solid var(--p-300); color: var(--p-900); padding: 8px 14px; font-size: 12px; border-radius: 8px; cursor: pointer; }
+  .stats { display: flex; gap: 18px; flex-wrap: wrap; font-family: var(--mono); font-size: 11px; color: var(--p-700); margin-top: 8px; }
+  .stats b { color: var(--p-950); font-weight: 600; }
+  .results-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .results-table th { text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--p-700); padding: 8px 10px; border-bottom: 1px solid var(--p-200); }
+  .results-table td { padding: 12px 10px; border-bottom: 1px solid var(--p-100); vertical-align: top; }
+  .verdict { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; font-family: var(--mono); letter-spacing: 0.04em; }
+  .v-LIKELY { background: var(--signal-good-bg); color: var(--signal-good); }
+  .v-POSSIBLE { background: var(--signal-warn-bg); color: var(--signal-warn); }
+  .v-UNLIKELY { background: var(--p-200); color: var(--p-700); }
+  .v-PARSE_FAIL { background: var(--signal-bad-bg); color: var(--signal-bad); }
+  .v-PENDING { background: var(--p-100); color: var(--p-700); }
+  .raw-out { font-family: var(--mono); font-size: 11px; color: var(--p-700); margin-top: 4px; white-space: pre-wrap; max-width: 380px; word-break: break-word; }
+  details { margin-top: 12px; }
+  details summary { cursor: pointer; font-size: 12px; color: var(--iris-700); font-family: var(--mono); }
+  pre { font-family: var(--mono); font-size: 11px; background: var(--p-50); padding: 10px 12px; border-radius: 6px; overflow-x: auto; margin: 6px 0 0; }
+  .pill-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .pill { font-family: var(--mono); font-size: 10px; padding: 2px 8px; border-radius: 999px; background: var(--p-100); color: var(--p-700); }
+  .agreement-note { font-family: var(--mono); font-size: 11px; color: var(--p-700); margin-top: 10px; padding: 10px 12px; background: var(--iris-50); border: 1px solid var(--iris-100); border-radius: 8px; line-height: 1.5; }
+  .agreement-note b { color: var(--iris-700); }
+  .stub-warning { background: var(--signal-warn-bg); color: var(--signal-warn); padding: 10px 14px; border-radius: 8px; font-size: 12px; margin-bottom: 18px; line-height: 1.5; }
+  .stub-warning code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 3px; font-size: 11px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Classification harness</h1>
+  <p class="sub">Standalone test rig for the proposed two-stage pipeline. Stage 1 classifies trials as <b>LIKELY / POSSIBLE / UNLIKELY</b> using a short prompt, before the full simplification runs. Use this to validate latency, parse-rate, and verdict stability against real ClinicalTrials.gov payloads before wiring it into the app.</p>
+
+  <div class="stub-warning">
+    <b>Wire your model in <code>classifyOne()</code>.</b> The harness ships with a mock implementation that simulates 200–1500ms latency and ~85% parse success. Replace the body of <code>classifyOne()</code> with your real on-device call (Gemma 2 2B / MediaPipe / etc.).
+  </div>
+
+  <div class="panel">
+    <h2>Inputs</h2>
+    <div class="row">
+      <div>
+        <label for="user-desc">User description</label>
+        <textarea id="user-desc" rows="3">I'm 58 years old with breast cancer in Boston</textarea>
+      </div>
+      <div>
+        <label for="prompt-template">Classify prompt template</label>
+        <textarea id="prompt-template" rows="6" class="mono-area" style="font-family: var(--mono); font-size: 12px;">You are evaluating clinical trial fit.
+
+User: {{user}}
+Trial title: {{title}}
+Eligibility (excerpt): {{eligibility}}
+
+Reply on one line, exactly: VERDICT | one-sentence reason
+where VERDICT is LIKELY, POSSIBLE, or UNLIKELY.</textarea>
+      </div>
+    </div>
+
+    <div style="margin-top: 16px;">
+      <label for="trials-json">Trials (JSON array — paste from ClinicalTrials.gov or your fixture)</label>
+      <textarea id="trials-json" rows="10" style="font-family: var(--mono); font-size: 11.5px;"></textarea>
+    </div>
+
+    <div class="controls">
+      <button class="run" id="run-btn">Run classification</button>
+      <button class="ghost" id="reset-btn">Reset trials</button>
+      <label style="display:inline-flex;align-items:center;gap:6px;font-family:var(--sans);font-size:12px;text-transform:none;letter-spacing:0;color:var(--p-700);margin:0;">
+        Concurrency
+        <select id="concurrency" style="width:auto;padding:4px 8px;font-size:12px;">
+          <option value="1">1 (serial)</option>
+          <option value="2">2</option>
+          <option value="3" selected>3</option>
+          <option value="5">5</option>
+        </select>
+      </label>
+      <label style="display:inline-flex;align-items:center;gap:6px;font-family:var(--sans);font-size:12px;text-transform:none;letter-spacing:0;color:var(--p-700);margin:0;">
+        Eligibility max chars
+        <input id="elig-max" type="number" value="1500" min="200" max="8000" step="100" style="width:90px;padding:4px 8px;font-size:12px;" />
+      </label>
+    </div>
+    <div class="stats" id="run-stats" style="display:none;"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Results</h2>
+    <table class="results-table">
+      <thead>
+        <tr>
+          <th style="width: 38%;">Trial</th>
+          <th style="width: 14%;">Verdict</th>
+          <th style="width: 12%;">Latency</th>
+          <th>Raw output / reason</th>
+          <th style="width: 12%;">Expected</th>
+        </tr>
+      </thead>
+      <tbody id="results-body"></tbody>
+    </table>
+    <div class="agreement-note" id="agreement-note" style="display:none;"></div>
+  </div>
+
+  <details>
+    <summary>How to wire your model</summary>
+    <pre>// Replace the body of classifyOne() in this file's &lt;script&gt; block.
+// It must return: { verdict, reason, raw, latencyMs }
+//
+// async function classifyOne(prompt) {
+//   const t0 = performance.now();
+//   const raw = await window.iris.generate({ prompt, maxTokens: 60 });
+//   const latencyMs = performance.now() - t0;
+//   return { ...parseVerdict(raw), raw, latencyMs };
+// }
+//
+// parseVerdict() is already implemented — it looks for
+// /^(LIKELY|POSSIBLE|UNLIKELY)\s*[|:\-]\s*(.+)$/im in the model output.</pre>
+  </details>
+</div>
+
+<script>
+// ─── Sample fixture ────────────────────────────────────────────────────
+const SAMPLE_TRIALS = [
+  {
+    nctId: 'NCT05952557',
+    title: 'Phase IIIb Study of Ribociclib + Endocrine Therapy in Early Breast Cancer',
+    eligibility: 'Inclusion: Adult female, ≥18 years. HR-positive, HER2-negative early breast cancer. Completed definitive surgery. Postmenopausal status confirmed. ECOG 0-1. Adequate organ function. Exclusion: Prior CDK4/6 inhibitor. Pregnancy or breastfeeding. Active second malignancy.',
+    expected: 'LIKELY',
+  },
+  {
+    nctId: 'NCT06104020',
+    title: 'Sacituzumab Govitecan in Metastatic Triple-Negative Breast Cancer',
+    eligibility: 'Inclusion: Adult, any sex. Histologically confirmed metastatic triple-negative breast cancer (ER<1%, PR<1%, HER2-negative). At least one prior line of systemic therapy in metastatic setting. ECOG 0-2. Measurable disease per RECIST 1.1. Exclusion: Active CNS metastases. Prior topoisomerase I inhibitor.',
+    expected: 'POSSIBLE',
+  },
+  {
+    nctId: 'NCT05887492',
+    title: 'Adaptive Radiation Boost in Locally Advanced HER2+ Breast Cancer',
+    eligibility: 'Inclusion: Adult female. HER2-positive breast cancer confirmed by IHC 3+ or FISH-positive. Stage II-III disease. Completed neoadjuvant chemotherapy. ECOG 0-1. Exclusion: Prior radiation to chest. Pregnancy.',
+    expected: 'POSSIBLE',
+  },
+  {
+    nctId: 'NCT06221340',
+    title: 'Aerobic Exercise During Adjuvant Chemo for Breast Cancer Survivors',
+    eligibility: 'Inclusion: Adult, any sex. Breast cancer, any stage. Currently receiving or scheduled for adjuvant chemotherapy. Cleared by oncologist for moderate exercise. Exclusion: Cardiac contraindications.',
+    expected: 'LIKELY',
+  },
+  {
+    nctId: 'NCT04123456',
+    title: 'Pembrolizumab in Advanced Non-Small Cell Lung Cancer',
+    eligibility: 'Inclusion: Adult. Histologically confirmed advanced NSCLC. PD-L1 expression ≥50%. ECOG 0-1. Exclusion: Active autoimmune disease. Prior immunotherapy.',
+    expected: 'UNLIKELY',
+  },
+  {
+    nctId: 'NCT05123987',
+    title: 'Targeted Therapy in Pediatric Acute Lymphoblastic Leukemia',
+    eligibility: 'Inclusion: Pediatric patients aged 2-17 years. Newly diagnosed ALL. Exclusion: Adults. Prior chemotherapy.',
+    expected: 'UNLIKELY',
+  },
+];
+
+// ─── State ─────────────────────────────────────────────────────────────
+const $ = (id) => document.getElementById(id);
+let results = [];
+
+function fillFixture() {
+  $('trials-json').value = JSON.stringify(SAMPLE_TRIALS, null, 2);
+}
+fillFixture();
+$('reset-btn').onclick = () => { fillFixture(); renderResults([]); $('run-stats').style.display = 'none'; $('agreement-note').style.display = 'none'; };
+
+// ─── Parse helper ──────────────────────────────────────────────────────
+function parseVerdict(raw) {
+  if (!raw || typeof raw !== 'string') return { verdict: 'PARSE_FAIL', reason: '(empty output)' };
+  const m = raw.match(/^\s*(LIKELY|POSSIBLE|UNLIKELY)\s*[|:\-—]\s*(.+?)\s*$/im);
+  if (m) return { verdict: m[1].toUpperCase(), reason: m[2].trim() };
+  // Fallback: just look for the verdict word
+  const w = raw.match(/\b(LIKELY|POSSIBLE|UNLIKELY)\b/i);
+  if (w) return { verdict: w[1].toUpperCase(), reason: raw.replace(w[0], '').replace(/^[\s|:\-—]+/, '').trim() || '(no reason)' };
+  return { verdict: 'PARSE_FAIL', reason: raw.slice(0, 120) };
+}
+
+// ─── MOCK: replace this with your model call ───────────────────────────
+async function classifyOne(prompt, trial) {
+  const t0 = performance.now();
+  // Simulate latency between 200-1500ms
+  await new Promise(r => setTimeout(r, 200 + Math.random() * 1300));
+  // Simulate ~85% parse success — 15% of the time emit drift
+  const drift = Math.random() < 0.15;
+  let raw;
+  if (drift) {
+    raw = `Based on the user's description and the trial criteria, this seems ${['somewhat applicable', 'a partial match', 'maybe relevant'][Math.floor(Math.random()*3)]}.`;
+  } else {
+    // Use the expected verdict from fixture if available, otherwise random
+    const v = trial.expected || ['LIKELY','POSSIBLE','UNLIKELY'][Math.floor(Math.random()*3)];
+    const reasons = {
+      LIKELY: 'user demographics and condition appear to match the inclusion criteria.',
+      POSSIBLE: 'fits the broad condition but requires confirmation of subtype or stage.',
+      UNLIKELY: 'condition or demographic mismatch with trial requirements.',
+    };
+    raw = `${v} | ${reasons[v]}`;
+  }
+  const latencyMs = performance.now() - t0;
+  return { ...parseVerdict(raw), raw, latencyMs };
+}
+
+// ─── Run pipeline ──────────────────────────────────────────────────────
+async function runAll() {
+  let trials;
+  try {
+    trials = JSON.parse($('trials-json').value);
+    if (!Array.isArray(trials)) throw new Error('Not an array');
+  } catch (e) {
+    alert('Trials JSON is invalid: ' + e.message);
+    return;
+  }
+  const userDesc = $('user-desc').value.trim();
+  const template = $('prompt-template').value;
+  const concurrency = parseInt($('concurrency').value, 10);
+  const eligMax = parseInt($('elig-max').value, 10) || 1500;
+
+  $('run-btn').disabled = true;
+  results = trials.map(t => ({ trial: t, status: 'PENDING' }));
+  renderResults(results);
+  $('run-stats').style.display = 'flex';
+  $('agreement-note').style.display = 'none';
+
+  const startT = performance.now();
+  const queue = [...trials.entries()];
+  const workers = [];
+
+  function next() {
+    const item = queue.shift();
+    if (!item) return null;
+    const [idx, trial] = item;
+    const elig = (trial.eligibility || '').slice(0, eligMax);
+    const prompt = template
+      .replace('{{user}}', userDesc)
+      .replace('{{title}}', trial.title || trial.briefTitle || '')
+      .replace('{{eligibility}}', elig);
+    return classifyOne(prompt, trial).then(r => {
+      results[idx] = { trial, status: 'DONE', ...r };
+      renderResults(results);
+      updateStats(startT);
+    }).then(next);
+  }
+  for (let i = 0; i < Math.min(concurrency, trials.length); i++) workers.push(next());
+  await Promise.all(workers);
+
+  $('run-btn').disabled = false;
+  computeAgreement();
+}
+
+$('run-btn').onclick = runAll;
+
+// ─── Rendering ─────────────────────────────────────────────────────────
+function renderResults(rows) {
+  const body = $('results-body');
+  if (!rows.length) { body.innerHTML = '<tr><td colspan="5" style="color:var(--p-500);font-style:italic;padding:24px 10px;">No results yet — click <b>Run classification</b>.</td></tr>'; return; }
+  body.innerHTML = rows.map(r => {
+    const verdict = r.status === 'PENDING' ? 'PENDING' : (r.verdict || 'PARSE_FAIL');
+    const latency = r.latencyMs != null ? `${Math.round(r.latencyMs)}ms` : '—';
+    const expected = r.trial.expected || '—';
+    const match = r.verdict && r.trial.expected
+      ? (r.verdict === r.trial.expected ? '✓' : '✗')
+      : '';
+    const matchColor = match === '✓' ? 'var(--signal-good)' : match === '✗' ? 'var(--signal-bad)' : 'var(--p-500)';
+    return `
+      <tr>
+        <td>
+          <div style="font-family: var(--serif); font-weight: 600; color: var(--p-950); font-size: 13.5px; line-height: 1.35;">${escapeHtml(r.trial.title || r.trial.briefTitle || r.trial.nctId)}</div>
+          <div style="font-family: var(--mono); font-size: 10.5px; color: var(--p-500); margin-top: 2px;">${escapeHtml(r.trial.nctId || '')}</div>
+        </td>
+        <td><span class="verdict v-${verdict}">${verdict}</span></td>
+        <td style="font-family: var(--mono); font-size: 12px; color: var(--p-700);">${latency}</td>
+        <td>
+          <div style="font-size: 12.5px; color: var(--p-900); line-height: 1.5;">${escapeHtml(r.reason || '—')}</div>
+          ${r.raw && r.raw !== r.reason ? `<div class="raw-out">raw: ${escapeHtml(r.raw)}</div>` : ''}
+        </td>
+        <td style="font-family: var(--mono); font-size: 11px; color: var(--p-700);">
+          ${expected}
+          ${match ? `<span style="color:${matchColor}; margin-left: 6px; font-weight: 600;">${match}</span>` : ''}
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+renderResults([]);
+
+function updateStats(startT) {
+  const done = results.filter(r => r.status === 'DONE');
+  const elapsed = performance.now() - startT;
+  const lats = done.filter(r => r.latencyMs != null).map(r => r.latencyMs);
+  const avg = lats.length ? lats.reduce((a,b)=>a+b,0)/lats.length : 0;
+  const max = lats.length ? Math.max(...lats) : 0;
+  const parseFail = done.filter(r => r.verdict === 'PARSE_FAIL').length;
+  const parseRate = done.length ? ((done.length - parseFail) / done.length * 100).toFixed(0) : 0;
+  $('run-stats').innerHTML = `
+    <span><b>${done.length} / ${results.length}</b> done</span>
+    <span>elapsed <b>${(elapsed/1000).toFixed(1)}s</b></span>
+    <span>avg latency <b>${Math.round(avg)}ms</b></span>
+    <span>max latency <b>${Math.round(max)}ms</b></span>
+    <span>parse rate <b>${parseRate}%</b></span>
+    <span>parse fails <b>${parseFail}</b></span>
+  `;
+}
+
+function computeAgreement() {
+  const withExpected = results.filter(r => r.status === 'DONE' && r.trial.expected);
+  if (!withExpected.length) return;
+  const matches = withExpected.filter(r => r.verdict === r.trial.expected).length;
+  const pct = (matches / withExpected.length * 100).toFixed(0);
+  const note = $('agreement-note');
+  note.style.display = 'block';
+  note.innerHTML = `<b>Agreement with expected:</b> ${matches} / ${withExpected.length} (${pct}%) — useful as a smoke test once you've labeled a held-out set. Below ~80% means the prompt or model needs work before this drives sort order.`;
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+</script>
+</body>
+</html>

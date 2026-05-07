@@ -4,8 +4,8 @@ import { NLP_MODELS, resolveModelKey } from '../utils/nlpModels'
 
 const STORAGE_KEY = 'iris_nlp_enabled'
 
-export default function NaturalLanguageInput({ onExtract }) {
-  const [expanded, setExpanded] = useState(false)
+export default function NaturalLanguageInput({ onExtract, embedded = false }) {
+  const [expanded, setExpanded] = useState(embedded)
   const [text, setText] = useState('')
   const [extracted, setExtracted] = useState(null)
   const [consented, setConsented] = useState(() => {
@@ -26,14 +26,35 @@ export default function NaturalLanguageInput({ onExtract }) {
   const [confirmingClear, setConfirmingClear] = useState(false)
   const [clearing, setClearing] = useState(false)
   const [clearError, setClearError] = useState(null)
+  // If the user submits while the model is still downloading, hold the
+  // intent and auto-fire when status flips to ready. Lets typing happen
+  // in parallel with the one-time download.
+  const [pendingSubmit, setPendingSubmit] = useState(false)
 
-  // Auto-load model on expand if user previously consented
+  // Auto-load model on expand if user previously consented.
+  //
+  // The cleanup resets hasAutoLoaded so React StrictMode's dev double-invoke
+  // (mount → cleanup → re-run) re-fires load() on the second pass — load()
+  // is what re-attaches the worker listener via ensureSubscribed. Without
+  // this reset, the listener detached during cleanup never gets re-attached
+  // and the worker's eventual 'ready' message broadcasts to an empty Set,
+  // leaving status stuck on 'downloading' forever.
+  //
+  // Gate is `status === 'idle'` only — NOT `'idle' || 'downloading'`. Each
+  // StrictMode remount creates a fresh useNLP with status='idle' so the
+  // narrow gate still fires correctly on remount. Widening to 'downloading'
+  // would re-fire load() after every status flip during the download
+  // (cleanup → reset hasAutoLoaded → re-run → matches widened gate → re-load),
+  // posting redundant load messages to the worker.
   useEffect(() => {
     if (!expanded) { hasAutoLoaded.current = false; return }
     if (hasAutoLoaded.current) return
     if (consented && status === 'idle' && webGPUSupported) {
       hasAutoLoaded.current = true
       load(model.id, { isThinking: model.isThinking, chatOpts: model.chatOpts })
+    }
+    return () => {
+      hasAutoLoaded.current = false
     }
   }, [expanded, consented, status, webGPUSupported, load, model.id])
 
@@ -61,8 +82,7 @@ export default function NaturalLanguageInput({ onExtract }) {
     }
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault()
+  async function runExtraction() {
     if (!text.trim()) return
     const fields = await extract(text.trim())
     setExtracted(fields)
@@ -71,33 +91,66 @@ export default function NaturalLanguageInput({ onExtract }) {
     }
   }
 
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!text.trim()) return
+    if (status !== 'ready') {
+      setPendingSubmit(true)
+      return
+    }
+    setPendingSubmit(false)
+    await runExtraction()
+  }
+
+  // Drain a queued submit the moment the model becomes ready.
+  useEffect(() => {
+    if (status !== 'ready') return
+    if (!pendingSubmit) return
+    if (!text.trim()) { setPendingSubmit(false); return }
+    setPendingSubmit(false)
+    runExtraction()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, pendingSubmit])
+
   function getProgressLabel() {
     if (!progress) return 'Downloading AI model…'
     if (progress.text) return progress.text
     return `Downloading AI model… ${Math.round((progress.progress ?? 0) * 100)}%`
   }
 
-  const badgeLabel = !webGPUSupported ? 'Unavailable' : 'New'
+  const badgeLabel = !webGPUSupported ? 'Unavailable' : null
   const badgeClass = !webGPUSupported
     ? 'bg-parchment-200 text-parchment-700'
-    : 'bg-parchment-500 text-parchment-950'
+    : 'bg-iris-100 text-iris-700'
+
+  const outerClass = embedded
+    ? 'px-4 sm:px-7 pt-2 pb-4'
+    : 'bg-parchment-50 border-b border-parchment-200 px-6 py-3'
 
   return (
-    <div className="bg-parchment-100 border-b border-parchment-300 px-6 py-3">
-      <button
-        type="button"
-        className="flex items-center gap-2 text-sm text-parchment-800 hover:text-parchment-950"
-        onClick={() => setExpanded(e => !e)}
-        aria-expanded={expanded}
-        aria-controls="nlp-panel"
-      >
-        <span aria-hidden="true">{expanded ? '▼' : '▶'}</span>
-        <span>Or, describe your situation in your own words</span>
-        <span className={`text-xs px-2 py-0.5 rounded-full ml-1 ${badgeClass}`}>{badgeLabel}</span>
-      </button>
+    <div className={outerClass}>
+      {!embedded && (
+        <button
+          type="button"
+          className={[
+            'inline-flex items-center gap-2 text-[12px] font-medium rounded-full px-3 py-1.5 transition-colors',
+            expanded
+              ? 'bg-parchment-100 text-parchment-950 border border-parchment-300'
+              : 'text-parchment-700 hover:text-parchment-950 hover:bg-parchment-100 border border-transparent',
+          ].join(' ')}
+          onClick={() => setExpanded(e => !e)}
+          aria-expanded={expanded}
+          aria-controls="nlp-panel"
+        >
+          <span>Describe in your own words</span>
+          <span className={`font-mono text-[10px] px-1.5 py-px rounded-full ${badgeClass}`}>
+            {badgeLabel ?? 'AI · on-device'}
+          </span>
+        </button>
+      )}
 
       {expanded && (
-        <div id="nlp-panel" className="mt-3 max-w-xl">
+        <div id="nlp-panel" className={embedded ? 'max-w-2xl' : 'mt-3 max-w-xl'}>
           {/* WebGPU unavailable */}
           {!webGPUSupported && (
             <div className="bg-parchment-50 border border-parchment-300 rounded-md p-3">
@@ -126,7 +179,7 @@ export default function NaturalLanguageInput({ onExtract }) {
               <button
                 type="button"
                 onClick={handleConsent}
-                className="bg-parchment-800 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-parchment-950"
+                className="bg-iris-600 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-iris-700"
               >
                 Download &amp; enable
               </button>
@@ -140,29 +193,9 @@ export default function NaturalLanguageInput({ onExtract }) {
             </div>
           )}
 
-          {/* Downloading / initialising */}
-          {webGPUSupported && consented && status === 'downloading' && (
-            <div>
-              <p className="text-sm text-parchment-800 italic mb-2">{getProgressLabel()}</p>
-              <div
-                className="bg-parchment-300 rounded-full h-1.5 overflow-hidden"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={Math.round((progress?.progress ?? 0) * 100)}
-              >
-                <div
-                  className="bg-parchment-800 h-1.5 rounded-full transition-all"
-                  style={{ width: `${Math.round((progress?.progress ?? 0) * 100)}%` }}
-                />
-              </div>
-              <p className="text-xs text-parchment-700 mt-1">This only happens once.</p>
-            </div>
-          )}
-
           {/* Error state */}
           {status === 'error' && (
-            <div className="bg-parchment-50 border border-parchment-400 rounded-md p-3">
+            <div className="bg-parchment-50 border border-parchment-400 rounded-md p-3 mb-3">
               <p className="text-sm text-parchment-900">
                 Something went wrong —{' '}
                 <button type="button" onClick={handleConsent} className="underline">
@@ -172,30 +205,80 @@ export default function NaturalLanguageInput({ onExtract }) {
             </div>
           )}
 
-          {/* Ready / extracting */}
-          {webGPUSupported && consented && (status === 'ready' || status === 'extracting') && (
+          {/* Input — available as soon as consent is given. The textarea
+              accepts typing while the model downloads in the background; the
+              submit button enables once status === 'ready'. If the user hits
+              submit during download, we queue and auto-fire on ready. */}
+          {webGPUSupported && consented && (status === 'downloading' || status === 'ready' || status === 'extracting') && (
             <>
               <form onSubmit={handleSubmit}>
-                <textarea
-                  rows={3}
-                  value={text}
-                  onChange={e => setText(e.target.value)}
-                  placeholder="e.g. 52-year-old woman in Brooklyn with triple negative breast cancer, already did chemo"
-                  className="w-full border border-parchment-400 rounded-md px-3 py-2 text-sm bg-white text-parchment-950 resize-none focus:outline-none focus:ring-2 focus:ring-parchment-800"
-                  aria-label="Natural language search"
-                  disabled={status === 'extracting'}
-                />
-                <p className="mt-1 text-xs text-parchment-700">
-                  IRIS will extract condition, location, age, and other relevant details automatically.
-                  {' '}<span className="text-parchment-500">Model: {model.label}</span>
-                </p>
-                <button
-                  type="submit"
-                  disabled={status === 'extracting' || !text.trim()}
-                  className="mt-2 bg-parchment-800 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-parchment-950 disabled:opacity-50"
-                >
-                  {status === 'extracting' ? 'Extracting…' : 'Find trials →'}
-                </button>
+                <div className="bg-white border border-parchment-300 rounded-xl shadow-sm flex items-start gap-3 px-4 py-3.5">
+                  <svg
+                    width="18" height="18" viewBox="0 0 20 20" fill="none"
+                    className="text-parchment-700 mt-1 shrink-0"
+                    aria-hidden="true"
+                  >
+                    <circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.5" />
+                    <path d="m14 14 4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                  <textarea
+                    rows={2}
+                    value={text}
+                    onChange={e => setText(e.target.value)}
+                    placeholder="e.g. 52-year-old woman in Brooklyn with triple negative breast cancer, already did chemo"
+                    className="flex-1 text-[15px] text-parchment-950 leading-snug resize-none focus:outline-none placeholder:text-parchment-500 bg-transparent"
+                    aria-label="Natural language search"
+                    disabled={status === 'extracting'}
+                  />
+                  <button
+                    type="submit"
+                    disabled={!text.trim() || status === 'extracting'}
+                    className="bg-iris-600 text-white px-3.5 py-2 rounded-md text-[13px] font-semibold hover:bg-iris-700 disabled:opacity-50 shrink-0"
+                  >
+                    {status === 'extracting'
+                      ? 'Extracting…'
+                      : pendingSubmit
+                        ? 'Queued…'
+                        : status === 'downloading'
+                          ? 'Run when ready'
+                          : 'Find trials'}
+                  </button>
+                </div>
+
+                {status === 'downloading' && (
+                  <div className="mt-2">
+                    <div className="flex items-center justify-between gap-3 mb-1">
+                      <p className="font-mono text-[11px] text-parchment-700">
+                        {getProgressLabel()}
+                        {pendingSubmit && (
+                          <span className="text-iris-700"> · search queued, runs when ready</span>
+                        )}
+                      </p>
+                      <p className="font-mono text-[11px] text-parchment-500 shrink-0">
+                        {model.sizeLabel} · one-time
+                      </p>
+                    </div>
+                    <div
+                      className="bg-parchment-200 rounded-full h-1 overflow-hidden"
+                      role="progressbar"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={Math.round((progress?.progress ?? 0) * 100)}
+                    >
+                      <div
+                        className="bg-iris-500 h-1 rounded-full transition-all"
+                        style={{ width: `${Math.round((progress?.progress ?? 0) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {status !== 'downloading' && (
+                  <p className="mt-2 font-mono text-[11px] text-parchment-700">
+                    IRIS extracts condition, location, age, and other details automatically.
+                    {' '}<span className="text-parchment-500">model: {model.label}</span>
+                  </p>
+                )}
               </form>
 
               {/* Clear local data — the model is the only thing IRIS stores
@@ -226,7 +309,7 @@ export default function NaturalLanguageInput({ onExtract }) {
                         type="button"
                         onClick={handleClearLocalData}
                         disabled={clearing}
-                        className="bg-parchment-800 text-white px-3 py-1.5 rounded-md font-semibold hover:bg-parchment-950 disabled:opacity-50"
+                        className="bg-iris-600 text-white px-3 py-1.5 rounded-md font-semibold hover:bg-iris-700 disabled:opacity-50"
                       >
                         {clearing ? 'Deleting…' : 'Delete'}
                       </button>
@@ -248,46 +331,31 @@ export default function NaturalLanguageInput({ onExtract }) {
             </>
           )}
 
-          {/* Confirmation card */}
+          {/* Understood chips */}
           {extracted && status === 'ready' && (
-            <div className="mt-3 bg-white border-2 border-parchment-700 rounded-lg p-4">
-              <h4 className="text-xs font-bold text-parchment-700 uppercase tracking-wide mb-3">
-                Here&apos;s what I understood
-              </h4>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {extracted.condition && (
-                  <span className="bg-parchment-100 border border-parchment-300 rounded px-2 py-1 text-xs text-parchment-950">
-                    <span className="text-parchment-500 mr-1 text-[10px] uppercase">Condition</span>
-                    {extracted.condition}
-                  </span>
-                )}
-                {extracted.location && (
-                  <span className="bg-parchment-100 border border-parchment-300 rounded px-2 py-1 text-xs text-parchment-950">
-                    <span className="text-parchment-500 mr-1 text-[10px] uppercase">Location</span>
-                    {extracted.location}
-                  </span>
-                )}
-                {extracted.age != null && (
-                  <span className="bg-parchment-100 border border-parchment-300 rounded px-2 py-1 text-xs text-parchment-950">
-                    <span className="text-parchment-500 mr-1 text-[10px] uppercase">Age</span>
-                    {extracted.age}
-                  </span>
-                )}
-                {extracted.sex && extracted.sex !== 'ALL' && (
-                  <span className="bg-parchment-100 border border-parchment-300 rounded px-2 py-1 text-xs text-parchment-950">
-                    <span className="text-parchment-500 mr-1 text-[10px] uppercase">Sex</span>
-                    {extracted.sex.charAt(0) + extracted.sex.slice(1).toLowerCase()}
-                  </span>
-                )}
-              </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="font-mono text-[11px] text-parchment-700">understood:</span>
+              {[
+                ['condition', extracted.condition],
+                ['location', extracted.location],
+                ['age', extracted.age],
+                ['sex', extracted.sex && extracted.sex !== 'ALL'
+                  ? extracted.sex.charAt(0) + extracted.sex.slice(1).toLowerCase()
+                  : null],
+              ].filter(([, v]) => v != null && v !== '').map(([k, v]) => (
+                <span
+                  key={k}
+                  className="inline-flex items-center gap-1.5 bg-white border border-parchment-300 rounded-md px-2 py-0.5 text-[12px]"
+                >
+                  <span className="font-mono text-[10px] uppercase tracking-[0.04em] text-parchment-500">{k}</span>
+                  <span className="text-parchment-950 font-medium">{v}</span>
+                </span>
+              ))}
               {!extracted.condition && (
-                <p className="text-xs text-amber-700 mt-1">
-                  ⚠ I couldn&apos;t determine the condition — please fill it in below.
-                </p>
+                <span className="text-[12px] text-amber-700">
+                  ⚠ couldn&apos;t determine condition — fill below
+                </span>
               )}
-              <p className="text-xs text-parchment-600 mt-2 italic">
-                Not right? Edit the form below or retype your description.
-              </p>
             </div>
           )}
         </div>

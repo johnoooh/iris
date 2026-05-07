@@ -9,7 +9,7 @@ const PHASES = [
 
 const RADII = ['25', '50', '100', '200']
 
-export default function SearchForm({ onSearch, prefill }) {
+export default function SearchForm({ onSearch, prefill, embedded = false }) {
   const [condition, setCondition] = useState('')
   const [location, setLocation] = useState('')
   const [radius, setRadius] = useState('50')
@@ -58,15 +58,26 @@ export default function SearchForm({ onSearch, prefill }) {
   }
 
   function inputClass(key) {
-    const base = 'w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-parchment-800'
+    const base = 'w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-iris-500'
     return prefillKeys.has(key)
       ? `${base} border-parchment-700 bg-parchment-100`
       : `${base} border-parchment-400 bg-white`
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-parchment-50 border-b border-parchment-300 px-6 py-6">
-      <h2 className="text-base font-semibold text-parchment-950 mb-4">Find clinical trials</h2>
+    <form
+      onSubmit={handleSubmit}
+      className={
+        embedded
+          ? 'px-4 sm:px-7 pt-2 pb-4'
+          : 'bg-parchment-50 border-b border-parchment-200 px-4 sm:px-6 py-4 sm:py-5'
+      }
+    >
+      {!embedded && (
+        <h2 className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-parchment-700 mb-4">
+          find clinical trials
+        </h2>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
         <div className="lg:col-span-2">
@@ -107,7 +118,7 @@ export default function SearchForm({ onSearch, prefill }) {
               id="radius"
               value={radius}
               onChange={e => setRadius(e.target.value)}
-              className="w-full border border-parchment-400 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-parchment-800"
+              className="w-full border border-parchment-400 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-iris-500"
             >
               {RADII.map(r => (
                 <option key={r} value={r}>{r} mi</option>
@@ -177,7 +188,7 @@ export default function SearchForm({ onSearch, prefill }) {
                     type="checkbox"
                     checked={phases.includes(value)}
                     onChange={() => togglePhase(value)}
-                    className="accent-parchment-800"
+                    className="accent-iris-500"
                   />
                   {label}
                 </label>
@@ -189,9 +200,9 @@ export default function SearchForm({ onSearch, prefill }) {
 
       <button
         type="submit"
-        className="bg-parchment-800 text-white px-6 py-2.5 rounded-md text-sm font-semibold hover:bg-parchment-950 focus:outline-none focus:ring-2 focus:ring-parchment-950 transition-colors"
+        className="bg-iris-600 text-white px-6 py-2.5 rounded-md text-[13px] font-semibold hover:bg-iris-700 focus:outline-none focus:ring-2 focus:ring-iris-500 focus:ring-offset-1 transition-colors"
       >
-        Search trials
+        Find trials →
       </button>
     </form>
   )

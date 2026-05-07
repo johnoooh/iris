@@ -1,8 +1,10 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useGeocode } from '../hooks/useGeocode'
 import { useClinicalTrials } from '../hooks/useClinicalTrials'
 import { useSimplifier } from '../hooks/useSimplifier'
 import ResultCard from './ResultCard'
+import TriageRow from './TriageRow'
+import MobileSheet from './MobileSheet'
 import {
   detectInputLanguage,
   outputLanguageFor,
@@ -10,6 +12,20 @@ import {
 } from '../utils/detectInputLanguage'
 
 const EAGER_BATCH_SIZE = 5
+const MOBILE_BREAKPOINT_PX = 820
+const LIST_WIDTH_PX = 400
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth <= MOBILE_BREAKPOINT_PX
+  )
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT_PX)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  return isMobile
+}
 
 export default function ResultsList({ searchParams, modelKey, userDescription, extractedFields }) {
   // Phase 3 simplification only ships for English and Spanish — those are
@@ -43,6 +59,39 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
   })
 
   const allTrials = data?.pages.flatMap(p => p.trials) ?? []
+
+  const isMobile = useIsMobile()
+  const [selectedNctId, setSelectedNctId] = useState(null)
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [compareSet, setCompareSet] = useState(() => new Set())
+
+  function toggleCompare(nctId) {
+    setCompareSet(prev => {
+      const next = new Set(prev)
+      if (next.has(nctId)) next.delete(nctId)
+      else if (next.size < 3) next.add(nctId)
+      return next
+    })
+  }
+
+  // Default selection to the first trial when results arrive (desktop only —
+  // on mobile we wait for an explicit tap to open the sheet).
+  useEffect(() => {
+    if (allTrials.length === 0) {
+      setSelectedNctId(null)
+      return
+    }
+    if (!selectedNctId || !allTrials.some(t => t.nctId === selectedNctId)) {
+      setSelectedNctId(allTrials[0].nctId)
+    }
+  }, [allTrials, selectedNctId])
+
+  const selected = allTrials.find(t => t.nctId === selectedNctId) ?? null
+
+  function onSelectTrial(nctId) {
+    setSelectedNctId(nctId)
+    if (isMobile) setSheetOpen(true)
+  }
 
   // Fire when the result set changes — keyed on the first 5 NCT IDs.
   // Using searchParams as the key would fire too early (before data arrives);
@@ -110,41 +159,198 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
     if (extractedFields) simplifier.enqueueAssessFit(trial, { outputLanguage })
   }
 
+  function renderDetail(trial) {
+    return (
+      <ResultCard
+        trial={trial}
+        coords={coords ?? null}
+        simplification={simplifier.states.get(trial.nctId)}
+        onRequestSimplify={simplificationSupported ? handleRequestSimplify : null}
+        inputLanguage={inputLanguage}
+        simplificationSupported={simplificationSupported}
+        pane
+      />
+    )
+  }
+
   return (
-    <section className="px-6 py-6" aria-live="polite" aria-label="Search results">
+    <section className="flex flex-col flex-1 min-h-0" aria-label="Search results">
       {showGeoFallback && (
-        <p className="text-xs text-parchment-700 mb-3 italic">
+        <p className="px-6 py-2 text-xs text-parchment-700 italic border-b border-parchment-200">
           Couldn&apos;t pinpoint that location — showing results without distance filtering.
         </p>
       )}
 
-      <div className="flex items-center gap-4 mb-4">
-        <p className="text-sm text-parchment-800">
-          {totalCount.toLocaleString()} trial{totalCount !== 1 ? 's' : ''} found
-        </p>
+      <ResultsToolbar
+        totalCount={totalCount}
+        searchParams={searchParams}
+      />
+
+      <div
+        className="flex-1 grid min-h-0 overflow-hidden"
+        style={{
+          gridTemplateColumns: isMobile ? '1fr' : `${LIST_WIDTH_PX}px 1fr`,
+        }}
+      >
+        <div className="overflow-auto bg-parchment-100 border-r border-parchment-200 flex flex-col">
+          <ul className="flex flex-col">
+            {allTrials.map(trial => (
+              <li key={trial.nctId} className="border-b border-parchment-200">
+                <TriageRow
+                  trial={trial}
+                  coords={coords ?? null}
+                  selected={!isMobile && trial.nctId === selectedNctId}
+                  onSelect={onSelectTrial}
+                  comparing={compareSet.has(trial.nctId)}
+                  onToggleCompare={toggleCompare}
+                  compareDisabled={compareSet.size >= 3}
+                />
+              </li>
+            ))}
+          </ul>
+          {hasNextPage && (
+            <button
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+              className="m-4 text-sm text-iris-700 hover:text-iris-900 underline disabled:opacity-50 self-start"
+            >
+              {isFetchingNextPage ? 'Loading…' : 'Load more results'}
+            </button>
+          )}
+        </div>
+
+        {!isMobile && (
+          <div className="overflow-auto bg-white" aria-live="polite">
+            {selected && renderDetail(selected)}
+          </div>
+        )}
       </div>
 
-      {allTrials.map(trial => (
-        <ResultCard
-          key={trial.nctId}
-          trial={trial}
-          coords={coords ?? null}
-          simplification={simplifier.states.get(trial.nctId)}
-          onRequestSimplify={simplificationSupported ? handleRequestSimplify : null}
-          inputLanguage={inputLanguage}
-          simplificationSupported={simplificationSupported}
+      {compareSet.size > 0 && (
+        <CompareBar
+          count={compareSet.size}
+          onClear={() => setCompareSet(new Set())}
         />
-      ))}
+      )}
 
-      {hasNextPage && (
-        <button
-          onClick={() => fetchNextPage()}
-          disabled={isFetchingNextPage}
-          className="mt-4 text-sm text-parchment-800 underline hover:text-parchment-950 disabled:opacity-50"
+      {isMobile && (
+        <MobileSheet
+          open={sheetOpen}
+          onClose={() => setSheetOpen(false)}
+          label={selected ? `Trial details: ${selected.title}` : 'Trial details'}
         >
-          {isFetchingNextPage ? 'Loading…' : 'Load more results'}
-        </button>
+          {selected && renderDetail(selected)}
+        </MobileSheet>
       )}
     </section>
+  )
+}
+
+const STATUS_LABELS = {
+  RECRUITING: 'recruiting',
+  NOT_YET_RECRUITING: 'not yet recruiting',
+  ACTIVE_NOT_RECRUITING: 'active, not recruiting',
+  COMPLETED: 'completed',
+  ALL: null,
+}
+
+const PHASE_LABELS = {
+  EARLY_PHASE1: 'Early Phase 1',
+  PHASE1: 'Phase 1',
+  PHASE2: 'Phase 2',
+  PHASE3: 'Phase 3',
+  PHASE4: 'Phase 4',
+}
+
+const SORT_OPTIONS = [
+  { id: 'fit',      label: 'Best fit',     disabled: true, title: 'Available once on-device classification runs' },
+  { id: 'distance', label: 'Distance',     disabled: true, title: 'Sort wiring coming in a follow-up' },
+  { id: 'phase',    label: 'Phase',        disabled: true, title: 'Sort wiring coming in a follow-up' },
+  { id: 'recent',   label: 'Most recent',  disabled: true, title: 'Sort wiring coming in a follow-up' },
+]
+
+function ResultsToolbar({ totalCount, searchParams }) {
+  const [sort, setSort] = useState('recent')
+
+  const summaryParts = [`${totalCount.toLocaleString()} trial${totalCount !== 1 ? 's' : ''}`]
+  if (searchParams.location) summaryParts.push(`near ${searchParams.location}`)
+  if (searchParams.location && searchParams.radius) summaryParts.push(`within ${searchParams.radius} mi`)
+  const statusLabel = STATUS_LABELS[searchParams.status]
+  if (statusLabel) summaryParts.push(statusLabel)
+  if (searchParams.phases?.length) {
+    summaryParts.push(searchParams.phases.map(p => PHASE_LABELS[p] ?? p).join(' / '))
+  }
+
+  return (
+    <div className="px-4 sm:px-6 py-3 border-b border-parchment-200 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+      <p className="font-mono text-[11px] text-parchment-700 leading-snug">
+        {summaryParts.map((part, i) => (
+          <span key={i}>
+            {i > 0 && <span className="text-parchment-300 mx-1.5" aria-hidden="true">·</span>}
+            {part}
+          </span>
+        ))}
+      </p>
+      <div className="hidden sm:flex items-center gap-1" role="group" aria-label="Sort results">
+        <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-parchment-700 mr-2">
+          sort
+        </span>
+        {SORT_OPTIONS.map(opt => {
+          const active = sort === opt.id
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => !opt.disabled && setSort(opt.id)}
+              disabled={opt.disabled}
+              title={opt.title}
+              {...(opt.disabled ? {} : { 'aria-pressed': active })}
+              className={[
+                'text-[11px] px-2 py-0.5 rounded-md transition-colors',
+                opt.disabled
+                  ? 'text-parchment-500 cursor-not-allowed'
+                  : active
+                    ? 'bg-iris-50 text-iris-700 font-medium'
+                    : 'text-parchment-700 hover:text-parchment-950 hover:bg-parchment-100',
+              ].join(' ')}
+            >
+              {opt.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function CompareBar({ count, onClear }) {
+  return (
+    <div
+      className="border-t border-parchment-200 bg-white px-4 py-2.5 flex items-center justify-between gap-3 shrink-0"
+      style={{ boxShadow: '0 -4px 16px rgba(28, 24, 18, 0.06)' }}
+      role="region"
+      aria-label="Compare selection"
+    >
+      <span className="text-[13px] text-parchment-900">
+        <strong className="font-semibold">{count}</strong> in compare
+      </span>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onClear}
+          className="text-[12px] text-parchment-700 hover:text-parchment-950 px-2 py-1"
+        >
+          Clear
+        </button>
+        <button
+          type="button"
+          disabled
+          title="Compare view coming soon"
+          className="bg-iris-600 text-white px-4 py-1.5 rounded-md text-[13px] font-semibold opacity-60 cursor-not-allowed"
+        >
+          Compare →
+        </button>
+      </div>
+    </div>
   )
 }

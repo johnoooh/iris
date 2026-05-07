@@ -126,12 +126,15 @@ self.onmessage = async (event) => {
       const request = {
         messages: [{ role: 'user', content: prompt }],
         max_tokens: type === 'summarize' ? 500 : 250,
-        // Summarize uses temperature 0 (greedy) because faithfulness to the
-        // source matters more than fluency variation — fabrications drop
-        // significantly at low temperatures. Assess-fit keeps a small
-        // temperature so its hedging language ("may", "might") doesn't
-        // collapse into a single deterministic phrase across trials.
-        temperature: type === 'summarize' ? 0 : 0.2,
+        // Summarize uses a tiny temperature (0.1) rather than 0 to escape
+        // greedy-decoding repetition traps — at temperature 0 we observed a
+        // run where the model emitted the same sentence 35+ times until
+        // max_tokens. frequency_penalty further discourages echoing the
+        // same n-grams. Assess-fit keeps a slightly higher temperature so
+        // its hedging language ("may", "might") doesn't collapse into a
+        // single deterministic phrase across trials.
+        temperature: type === 'summarize' ? 0.1 : 0.2,
+        frequency_penalty: type === 'summarize' ? 0.3 : 0,
         stream: true,
       }
       if (isThinkingModel) request.extra_body = { enable_thinking: false }

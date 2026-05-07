@@ -1,10 +1,7 @@
 import { lazy, Suspense, useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import Header from './components/Header'
-import DedicationBanner from './components/DedicationBanner'
-import PrivacyStatement from './components/PrivacyStatement'
-import SearchForm from './components/SearchForm'
-import NaturalLanguageInput from './components/NaturalLanguageInput'
+import UnifiedSearchBar from './components/UnifiedSearchBar'
 import ResultsList from './components/ResultsList'
 import Footer from './components/Footer'
 import { resolveModelKey } from './utils/nlpModels'
@@ -69,11 +66,12 @@ function IrisApp() {
   return (
     <div className="min-h-screen bg-parchment-50 flex flex-col">
       <Header />
-      <DedicationBanner />
-      <PrivacyStatement />
-      <main className="flex-1">
-        <NaturalLanguageInput onExtract={handleExtract} />
-        <SearchForm onSearch={setSearchParams} prefill={prefill} />
+      <main className="flex-1 flex flex-col min-h-0">
+        <UnifiedSearchBar
+          onExtract={handleExtract}
+          onSearch={setSearchParams}
+          prefill={prefill}
+        />
         {searchParams && (
           <ResultsList
             searchParams={searchParams}
