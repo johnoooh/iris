@@ -507,6 +507,8 @@ English translation:`
   async function copyMarkdown() {
     const md = buildMarkdownReport({
       userDesc,
+      translatedDesc,
+      translateFirst,
       promptTemplate,
       eligMax,
       modelLabel: model.label,
@@ -751,7 +753,7 @@ English translation:`
   )
 }
 
-function buildMarkdownReport({ userDesc, promptTemplate, eligMax, modelLabel, results, stats }) {
+function buildMarkdownReport({ userDesc, translatedDesc, translateFirst, promptTemplate, eligMax, modelLabel, results, stats }) {
   const escape = (s) => String(s ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ').trim()
   const truncate = (s, n) => {
     const t = escape(s)
