@@ -224,11 +224,11 @@ export default function ResultCard({
               classifier) is the safer signal. The DoctorDisclaimer
               below renders unconditionally to set expectations. */}
 
-          {(sumState.status === 'queued' || sumState.status === 'streaming') && (
-            <p className="font-mono text-[11px] text-parchment-700 italic mb-2">
-              Generating plain-language summary…
-            </p>
-          )}
+          {/* The "generating plain-language summary…" message lives in the
+              pipeline caption above (PipelineCaption with stage='awaiting-
+              summary'). Used to also render here as a fallback italic line
+              but that caused a visible duplicate while sumState was
+              'queued'. Pretty pill is the single source. */}
 
           {sumState.status === 'complete' && trial.summary && (
             <details className="mt-2">
