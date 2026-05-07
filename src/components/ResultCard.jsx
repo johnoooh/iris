@@ -256,14 +256,21 @@ export default function ResultCard({
       )}
 
       {pane && (
-        <div className="mt-6 mb-2 px-4 py-3 rounded-lg bg-iris-50 border border-iris-100">
-          <p className="text-[13px] text-parchment-900 leading-relaxed">
-            <strong className="font-semibold text-iris-700">Talk to your oncologist</strong> if you
-            think you might qualify for this trial. The plain-language summary above is generated
-            on-device by a small AI model — it can miss or misstate eligibility details. Your care
-            team can confirm whether the trial fits your specific situation.
+        <details className="mt-6 mb-2 px-4 py-3 rounded-lg bg-iris-50 border border-iris-100 group">
+          <summary className="cursor-pointer list-none text-[13px] text-parchment-900 leading-relaxed select-none">
+            <span className="font-semibold text-iris-700">Check with your doctor when exploring treatment options</span>
+            {' '}— this AI summary uses plain language to explain the treatment but can miss
+            eligibility details.
+            <span className="font-mono text-[11px] text-iris-700 ml-2 opacity-70 group-open:hidden">
+              why?
+            </span>
+          </summary>
+          <p className="mt-3 text-[13px] text-parchment-900 leading-relaxed">
+            The plain-language summary above was generated on your device by a small AI model. It
+            can miss or misstate who qualifies for a trial. Your care team has your full medical
+            picture and can confirm whether this one actually fits.
           </p>
-        </div>
+        </details>
       )}
 
       {pane ? (
