@@ -239,7 +239,9 @@ export default function NaturalLanguageInput({ onExtract, embedded = false }) {
                           <span className="text-iris-700"> · search queued, runs when ready</span>
                         )}
                       </p>
-                      <p className="font-mono text-[11px] text-parchment-500 shrink-0">one-time</p>
+                      <p className="font-mono text-[11px] text-parchment-500 shrink-0">
+                        {model.sizeLabel} · one-time
+                      </p>
                     </div>
                     <div
                       className="bg-parchment-200 rounded-full h-1 overflow-hidden"
