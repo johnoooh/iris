@@ -335,6 +335,22 @@ Answer (one line, format exactly "<LABEL> | <one short reason>"):`
 
 const DEFAULT_USER_DESC = "I'm 58 years old with breast cancer in Boston"
 
+// Patient description presets for multilingual + edge-case validation. Same
+// 58yo woman with breast cancer in Boston, expressed in different languages
+// and registers (formal, terse, etc.) so we can stress-test the model's
+// understanding without changing the underlying clinical signal.
+const USER_PRESETS = [
+  { id: 'en',     label: 'English',                  text: "I'm 58 years old with breast cancer in Boston" },
+  { id: 'en-2',   label: 'English (more detail)',    text: "58-year-old woman in Boston, postmenopausal, recently diagnosed with breast cancer, looking for post-chemo treatment options" },
+  { id: 'es',     label: 'Spanish (Español)',        text: 'Tengo 58 años, vivo en Boston y tengo cáncer de mama' },
+  { id: 'es-2',   label: 'Spanish (more detail)',    text: 'Soy mujer de 58 años, posmenopáusica, vivo en Boston. Me diagnosticaron cáncer de mama y busco opciones de tratamiento después de quimioterapia.' },
+  { id: 'zh',     label: 'Mandarin (中文)',          text: '我58岁，住在波士顿，患有乳腺癌' },
+  { id: 'ar',     label: 'Arabic (العربية)',        text: 'أنا امرأة عمري 58 عامًا أعيش في بوسطن ومصابة بسرطان الثدي' },
+  { id: 'pt',     label: 'Portuguese (Português)',   text: 'Tenho 58 anos, moro em Boston e tenho câncer de mama' },
+  { id: 'fr',     label: 'French (Français)',        text: "J'ai 58 ans, je vis à Boston et j'ai un cancer du sein" },
+  { id: 'terse',  label: 'Terse / fragments',        text: '58F, BC, Boston' },
+]
+
 // Parser still accepts POSSIBLE in case the model emits it (older prompts,
 // instruction drift) — POSSIBLE is normalized to LIKELY since the binary
 // product question is "show or hide".
@@ -545,13 +561,32 @@ export default function ClassificationHarness() {
         <h2 className="font-serif font-semibold text-base mb-3">Inputs</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-iris-700 mb-1.5 block">
-              User description
-            </label>
+            <div className="flex items-center justify-between mb-1.5 gap-2 flex-wrap">
+              <label className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-iris-700">
+                User description
+              </label>
+              <select
+                value={USER_PRESETS.find(p => p.text === userDesc)?.id ?? 'custom'}
+                onChange={e => {
+                  const preset = USER_PRESETS.find(p => p.id === e.target.value)
+                  if (preset) setUserDesc(preset.text)
+                }}
+                className="text-[11px] px-2 py-1 border border-parchment-300 rounded bg-white text-parchment-700"
+                title="Swap the patient description to test multilingual handling and edge cases"
+              >
+                {!USER_PRESETS.some(p => p.text === userDesc) && (
+                  <option value="custom">— custom —</option>
+                )}
+                {USER_PRESETS.map(p => (
+                  <option key={p.id} value={p.id}>{p.label}</option>
+                ))}
+              </select>
+            </div>
             <textarea
               rows={3}
               value={userDesc}
               onChange={e => setUserDesc(e.target.value)}
+              dir={userDesc.match(/[؀-ۿ]/) ? 'rtl' : 'ltr'}
               className="w-full text-[13px] px-3 py-2.5 border border-parchment-300 rounded-lg bg-parchment-50 text-parchment-900 resize-y focus:outline-none focus:ring-2 focus:ring-iris-500"
             />
           </div>

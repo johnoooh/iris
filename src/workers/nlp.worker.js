@@ -30,18 +30,40 @@ self.onmessage = async (event) => {
     loading = true
     isThinkingModel = Boolean(isThinking)
     try {
-      const { CreateMLCEngine } = await import('@mlc-ai/web-llm')
+      const { CreateMLCEngine /* , prebuiltAppConfig */ } = await import('@mlc-ai/web-llm')
       // CreateMLCEngine signature: (modelId, engineConfig, chatOpts).
       // chatOpts is per-model config override (e.g. sliding_window_size:-1
       // for gemma3, whose prebuilt record sets context_window_size:4096
       // alongside sliding_window_size:512 — the engine rejects both being
       // positive).
+      //
+      // ─── Custom model wiring (stub) ──────────────────────────────────
+      // To serve a fine-tuned model (e.g. a domain-specific LoRA merged
+      // back into Qwen2.5-1.5B), uncomment the appConfig block below and
+      // add a matching entry to nlpModels.js with model_id matching the
+      // one here. The model and model_lib URLs must be CORS-accessible —
+      // HuggingFace Hub serves MLC artifacts with the right headers; a
+      // self-hosted bucket needs explicit CORS config. See
+      // ~/Documents/Github/sevry_vault/Work/ClaudeCode/iris/lora-training-process.md
+      // for the end-to-end LoRA → MLC → WebLLM pipeline.
+      //
+      // const appConfig = {
+      //   model_list: [
+      //     ...prebuiltAppConfig.model_list,
+      //     {
+      //       model: 'https://huggingface.co/USER/iris-classifier-q4f16_1-MLC/resolve/main/',
+      //       model_id: 'iris-classifier-q4f16_1-MLC',
+      //       model_lib: 'https://huggingface.co/USER/iris-classifier-q4f16_1-MLC/resolve/main/iris-classifier-q4f16_1-ctx4k_cs1k-webgpu.wasm',
+      //     },
+      //   ],
+      // }
       engine = await CreateMLCEngine(
         modelId ?? DEFAULT_MODEL_ID,
         {
           initProgressCallback: (progress) => {
             self.postMessage({ type: 'progress', progress })
           },
+          // appConfig, // ← uncomment alongside the block above
         },
         chatOpts ?? undefined,
       )
