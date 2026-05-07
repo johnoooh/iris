@@ -25,6 +25,12 @@ export const NLP_MODELS = {
     sizeLabel: '~1.9 GB',
     isThinking: false,
   },
+  qwen25: {
+    id: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC',
+    label: 'Qwen2.5 1.5B',
+    sizeLabel: '~900 MB',
+    isThinking: false,
+  },
 }
 
 export const DEFAULT_MODEL_KEY = 'gemma'

@@ -307,19 +307,23 @@ const DEFAULT_PROMPT = `You decide whether a clinical trial is worth showing to 
 
 Be inclusive on LIKELY: if the trial requires a subtype, biomarker, stage, or prior treatment the patient did NOT mention, still call it LIKELY — the patient or their doctor can verify. Only use UNLIKELY when the patient is clearly disqualified by something they DID state.
 
-Examples:
+Examples (note: each example uses a DIFFERENT patient — focus on the reasoning, not the patient details):
 
-Patient: "62-year-old man with prostate cancer"
-Trial: Olaparib in BRCA-Mutated Metastatic Prostate Cancer (Eligibility: men with BRCA mutation, metastatic prostate cancer)
-Answer: LIKELY | matches prostate cancer in a man; BRCA status can be verified
+Patient: "45-year-old woman with ovarian cancer"
+Trial: PARP Inhibitor in BRCA-Mutated Ovarian Cancer (Eligibility: women with ovarian cancer and BRCA mutation)
+Answer: LIKELY | matches ovarian cancer in a woman; BRCA status can be verified
 
-Patient: "62-year-old man with prostate cancer"
-Trial: Trastuzumab in HER2+ Breast Cancer (Eligibility: adult women with HER2+ breast cancer)
-Answer: UNLIKELY | trial is for breast cancer in women; patient has prostate cancer
+Patient: "70-year-old man with type 2 diabetes"
+Trial: Tamoxifen in Premenopausal Breast Cancer (Eligibility: premenopausal women with breast cancer)
+Answer: UNLIKELY | trial is for breast cancer in women; patient has diabetes
 
-Patient: "62-year-old man with prostate cancer"
-Trial: GLP-1 Agonist for Type 2 Diabetes (Eligibility: adults 18-75 with T2DM)
-Answer: UNLIKELY | trial is for type 2 diabetes; patient has prostate cancer
+Patient: "8-year-old child with asthma"
+Trial: Adult Anti-Inflammatory for Asthma (Eligibility: adults 18+ with persistent asthma)
+Answer: UNLIKELY | trial is for adults; patient is a child
+
+Patient: "55-year-old man with hypertension"
+Trial: Yoga Intervention for Adults with Chronic Conditions (Eligibility: adults 40-75 with any chronic condition)
+Answer: LIKELY | adult with chronic condition matches the broad inclusion
 
 Now classify:
 
