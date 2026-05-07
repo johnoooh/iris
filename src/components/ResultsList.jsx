@@ -117,13 +117,23 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
     nlp.load(model.id, { isThinking: model.isThinking, chatOpts: model.chatOpts })
   }, [canClassify, nlp.status, modelKey, nlp])
 
-  // Reset classification state when the search itself changes.
+  // Reset classification state when EITHER the search params OR the patient
+  // description changes. Including patientDesc handles the case where a user
+  // hits "Find trials" again with a refined prompt that happens to extract
+  // to the same condition: the API result set may be cached (same trials)
+  // but the verdicts are now stale w.r.t. the new patient description, so
+  // classifications + classifiedRef must be wiped and the in-flight batch
+  // cancelled so the next pass re-classifies against the new patient.
+  // Also resets the simplifier so any in-flight summary stops competing
+  // with the re-classification pass.
   useEffect(() => {
     classifiedRef.current = new Set()
     setClassifications(new Map())
     setClassifyProgress({ done: 0, total: 0 })
     if (cancelClassifyRef.current) cancelClassifyRef.current()
-  }, [searchParams])
+    simplifier.cancelPending()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, patientDesc])
 
   function toggleCompare(nctId) {
     setCompareSet(prev => {
