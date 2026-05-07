@@ -1,10 +1,12 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useCallback, useRef, useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import Header from './components/Header'
 import UnifiedSearchBar from './components/UnifiedSearchBar'
 import ResultsList from './components/ResultsList'
 import Footer from './components/Footer'
 import { resolveModelKey } from './utils/nlpModels'
+
+const COMPARE_LIMIT = 3
 
 const queryClient = new QueryClient()
 
@@ -37,6 +39,48 @@ function IrisApp() {
   const [modelKey] = useState(() =>
     resolveModelKey(typeof window !== 'undefined' ? window.location.search : '')
   )
+
+  // ─── Compare selection (lifted from ResultsList) ──────────────────
+  // Lives at App level so it survives search refinements (each new
+  // search re-mounts ResultsList, which would have wiped local state).
+  // pinnedTrials is a parallel cache of the full trial objects keyed
+  // by NCT ID — needed because a previously-pinned trial may not appear
+  // in the current result set, but the compare view still needs to
+  // render it. Cache is in-memory only (no localStorage) per the
+  // privacy promise.
+  const [compareSet, setCompareSet] = useState(() => new Set())
+  const pinnedTrialsRef = useRef(new Map())
+
+  const toggleCompare = useCallback((trial) => {
+    if (!trial?.nctId) return
+    setCompareSet(prev => {
+      const next = new Set(prev)
+      if (next.has(trial.nctId)) {
+        next.delete(trial.nctId)
+      } else if (next.size < COMPARE_LIMIT) {
+        next.add(trial.nctId)
+        // Populate the cache the moment a trial is pinned so the
+        // compare view has the data even after the user refines
+        // their search and the result set no longer contains it.
+        pinnedTrialsRef.current.set(trial.nctId, trial)
+      }
+      return next
+    })
+  }, [])
+
+  const clearCompare = useCallback(() => {
+    setCompareSet(new Set())
+    pinnedTrialsRef.current.clear()
+  }, [])
+
+  const removeFromCompare = useCallback((nctId) => {
+    setCompareSet(prev => {
+      const next = new Set(prev)
+      next.delete(nctId)
+      return next
+    })
+    pinnedTrialsRef.current.delete(nctId)
+  }, [])
 
   const testRoute = getTestRoute()
   if (testRoute === 'nlp' && NLPTestPanel) {
@@ -90,6 +134,11 @@ function IrisApp() {
             modelKey={modelKey}
             userDescription={userDescription}
             extractedFields={prefill}
+            compareSet={compareSet}
+            compareLimit={COMPARE_LIMIT}
+            onToggleCompare={toggleCompare}
+            onClearCompare={clearCompare}
+            onRemoveFromCompare={removeFromCompare}
           />
         )}
       </main>
