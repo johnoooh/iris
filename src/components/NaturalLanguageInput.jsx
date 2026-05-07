@@ -26,6 +26,10 @@ export default function NaturalLanguageInput({ onExtract, embedded = false }) {
   const [confirmingClear, setConfirmingClear] = useState(false)
   const [clearing, setClearing] = useState(false)
   const [clearError, setClearError] = useState(null)
+  // If the user submits while the model is still downloading, hold the
+  // intent and auto-fire when status flips to ready. Lets typing happen
+  // in parallel with the one-time download.
+  const [pendingSubmit, setPendingSubmit] = useState(false)
 
   // Auto-load model on expand if user previously consented
   useEffect(() => {
@@ -61,8 +65,7 @@ export default function NaturalLanguageInput({ onExtract, embedded = false }) {
     }
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault()
+  async function runExtraction() {
     if (!text.trim()) return
     const fields = await extract(text.trim())
     setExtracted(fields)
@@ -70,6 +73,29 @@ export default function NaturalLanguageInput({ onExtract, embedded = false }) {
       onExtract({ fields, description: text.trim() })
     }
   }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!text.trim()) return
+    if (status !== 'ready') {
+      // Model still downloading (or in some other transient state) — queue
+      // the submit so it auto-fires when ready.
+      setPendingSubmit(true)
+      return
+    }
+    setPendingSubmit(false)
+    await runExtraction()
+  }
+
+  // Drain a queued submit the moment the model becomes ready.
+  useEffect(() => {
+    if (status !== 'ready') return
+    if (!pendingSubmit) return
+    if (!text.trim()) { setPendingSubmit(false); return }
+    setPendingSubmit(false)
+    runExtraction()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, pendingSubmit])
 
   function getProgressLabel() {
     if (!progress) return 'Downloading AI model…'
@@ -152,29 +178,9 @@ export default function NaturalLanguageInput({ onExtract, embedded = false }) {
             </div>
           )}
 
-          {/* Downloading / initialising */}
-          {webGPUSupported && consented && status === 'downloading' && (
-            <div>
-              <p className="text-sm text-parchment-800 italic mb-2">{getProgressLabel()}</p>
-              <div
-                className="bg-parchment-200 rounded-full h-1.5 overflow-hidden"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={Math.round((progress?.progress ?? 0) * 100)}
-              >
-                <div
-                  className="bg-iris-500 h-1.5 rounded-full transition-all"
-                  style={{ width: `${Math.round((progress?.progress ?? 0) * 100)}%` }}
-                />
-              </div>
-              <p className="text-xs text-parchment-700 mt-1">This only happens once.</p>
-            </div>
-          )}
-
           {/* Error state */}
           {status === 'error' && (
-            <div className="bg-parchment-50 border border-parchment-400 rounded-md p-3">
+            <div className="bg-parchment-50 border border-parchment-400 rounded-md p-3 mb-3">
               <p className="text-sm text-parchment-900">
                 Something went wrong —{' '}
                 <button type="button" onClick={handleConsent} className="underline">
@@ -184,8 +190,11 @@ export default function NaturalLanguageInput({ onExtract, embedded = false }) {
             </div>
           )}
 
-          {/* Ready / extracting */}
-          {webGPUSupported && consented && (status === 'ready' || status === 'extracting') && (
+          {/* Input — available as soon as consent is given. The textarea
+              accepts typing while the model downloads in the background; the
+              submit button enables once status === 'ready'. If the user hits
+              submit during download, we queue and auto-fire on ready. */}
+          {webGPUSupported && consented && (status === 'downloading' || status === 'ready' || status === 'extracting') && (
             <>
               <form onSubmit={handleSubmit}>
                 <div className="bg-white border border-parchment-300 rounded-xl shadow-sm flex items-start gap-3 px-4 py-3.5">
@@ -208,16 +217,51 @@ export default function NaturalLanguageInput({ onExtract, embedded = false }) {
                   />
                   <button
                     type="submit"
-                    disabled={status === 'extracting' || !text.trim()}
+                    disabled={!text.trim() || status === 'extracting'}
                     className="bg-iris-600 text-white px-3.5 py-2 rounded-md text-[13px] font-semibold hover:bg-iris-700 disabled:opacity-50 shrink-0"
                   >
-                    {status === 'extracting' ? 'Extracting…' : 'Find trials'}
+                    {status === 'extracting'
+                      ? 'Extracting…'
+                      : pendingSubmit
+                        ? 'Queued…'
+                        : status === 'downloading'
+                          ? 'Run when ready'
+                          : 'Find trials'}
                   </button>
                 </div>
-                <p className="mt-2 font-mono text-[11px] text-parchment-700">
-                  IRIS extracts condition, location, age, and other details automatically.
-                  {' '}<span className="text-parchment-500">model: {model.label}</span>
-                </p>
+
+                {status === 'downloading' && (
+                  <div className="mt-2">
+                    <div className="flex items-center justify-between gap-3 mb-1">
+                      <p className="font-mono text-[11px] text-parchment-700">
+                        {getProgressLabel()}
+                        {pendingSubmit && (
+                          <span className="text-iris-700"> · search queued, runs when ready</span>
+                        )}
+                      </p>
+                      <p className="font-mono text-[11px] text-parchment-500 shrink-0">one-time</p>
+                    </div>
+                    <div
+                      className="bg-parchment-200 rounded-full h-1 overflow-hidden"
+                      role="progressbar"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={Math.round((progress?.progress ?? 0) * 100)}
+                    >
+                      <div
+                        className="bg-iris-500 h-1 rounded-full transition-all"
+                        style={{ width: `${Math.round((progress?.progress ?? 0) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {status !== 'downloading' && (
+                  <p className="mt-2 font-mono text-[11px] text-parchment-700">
+                    IRIS extracts condition, location, age, and other details automatically.
+                    {' '}<span className="text-parchment-500">model: {model.label}</span>
+                  </p>
+                )}
               </form>
 
               {/* Clear local data — the model is the only thing IRIS stores
