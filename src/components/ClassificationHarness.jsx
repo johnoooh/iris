@@ -33,12 +33,14 @@ const SAMPLE_TRIALS = [
     title: 'Pembrolizumab in Advanced Non-Small Cell Lung Cancer',
     eligibility: 'Inclusion: Adult. Histologically confirmed advanced NSCLC. PD-L1 expression ≥50%. ECOG 0-1. Exclusion: Active autoimmune disease. Prior immunotherapy.',
     expected: 'UNLIKELY',
+    outOfScope: true, // NSCLC — wouldn't appear in a breast-cancer API search
   },
   {
     nctId: 'NCT05123987',
     title: 'Targeted Therapy in Pediatric Acute Lymphoblastic Leukemia',
     eligibility: 'Inclusion: Pediatric patients aged 2-17 years. Newly diagnosed ALL. Exclusion: Adults. Prior chemotherapy.',
     expected: 'UNLIKELY',
+    outOfScope: true, // Pediatric ALL — wouldn't appear in a breast-cancer API search
   },
 
   // ─── Subtype-gated breast cancer trials — POSSIBLE without confirmed subtype ───
@@ -93,30 +95,35 @@ const SAMPLE_TRIALS = [
     title: 'Pembrolizumab in Advanced Melanoma',
     eligibility: 'Inclusion: Adults with histologically confirmed unresectable Stage III or Stage IV melanoma. ECOG 0-1. No prior systemic therapy for advanced disease. Exclusion: Active autoimmune disease.',
     expected: 'UNLIKELY',
+    outOfScope: true,
   },
   {
     nctId: 'NCT04678901',
     title: 'Apixaban vs. Warfarin in Atrial Fibrillation',
     eligibility: 'Inclusion: Adults ≥18 years with non-valvular atrial fibrillation. CHA2DS2-VASc score ≥2. Exclusion: Mechanical heart valve. Active bleeding.',
     expected: 'UNLIKELY',
+    outOfScope: true,
   },
   {
     nctId: 'NCT04789012',
     title: 'GLP-1 Agonist for Weight Management in Type 2 Diabetes',
     eligibility: 'Inclusion: Adults 18-75 with Type 2 diabetes mellitus. BMI ≥30. HbA1c 7.0-10.0%. Exclusion: Type 1 diabetes. Active malignancy within 5 years. History of pancreatitis.',
     expected: 'UNLIKELY',
+    outOfScope: true,
   },
   {
     nctId: 'NCT04890123',
     title: 'Robotic Prostatectomy Outcomes in Localized Prostate Cancer',
     eligibility: 'Inclusion: Men ≥40 years with biopsy-confirmed clinically localized prostate cancer (T1-T2). Candidate for radical prostatectomy. Exclusion: Prior pelvic surgery or radiation.',
     expected: 'UNLIKELY',
+    outOfScope: true,
   },
   {
     nctId: 'NCT04901234',
     title: 'Pediatric Vaccine Immunogenicity Study',
     eligibility: 'Inclusion: Healthy children aged 6 months to 5 years. Up to date on routine immunizations. Exclusion: Immunocompromised. Recent illness within 14 days.',
     expected: 'UNLIKELY',
+    outOfScope: true,
   },
 
   // ─── Edge cases — should challenge the model ───
@@ -226,6 +233,7 @@ Exclusion Criteria:
   {
     nctId: 'NCT-LONG-03',
     title: 'Phase III Study of Pembrolizumab Plus Chemotherapy versus Chemotherapy Alone for First-Line Treatment of Metastatic Squamous Non-Small Cell Lung Cancer',
+    outOfScope: true,
     eligibility: `Inclusion Criteria:
 
 1. Histologically or cytologically confirmed Stage IV squamous non-small cell lung cancer (NSCLC) per AJCC 8th edition.
@@ -264,6 +272,7 @@ Exclusion Criteria:
   {
     nctId: 'NCT-LONG-04',
     title: 'Multicenter Randomized Trial of Empagliflozin in Patients with Heart Failure with Preserved Ejection Fraction and Type 2 Diabetes',
+    outOfScope: true,
     eligibility: `Inclusion Criteria:
 
 1. Adults aged 40 to 85 years at consent.
@@ -404,6 +413,7 @@ export default function ClassificationHarness() {
   const [eligMax, setEligMax] = useState(1500)
   const [translateFirst, setTranslateFirst] = useState(false)
   const [translatedDesc, setTranslatedDesc] = useState(null)
+  const [productionMode, setProductionMode] = useState(true)
   const [results, setResults] = useState([])
   const [running, setRunning] = useState(false)
   const [startT, setStartT] = useState(0)
@@ -509,6 +519,8 @@ English translation:`
       userDesc,
       translatedDesc,
       translateFirst,
+      productionMode,
+      hiddenCount,
       promptTemplate,
       eligMax,
       modelLabel: model.label,
@@ -533,9 +545,15 @@ English translation:`
   const parseFails = done.filter(r => r.verdict === 'PARSE_FAIL').length
   const parseRate = done.length ? Math.round(((done.length - parseFails) / done.length) * 100) : 0
   const elapsed = startT ? ((performance.now() - startT) / 1000).toFixed(1) : '0.0'
-  const withExpected = done.filter(r => r.trial.expected)
+  // Production mode hides trials the CT.gov API would never return for the
+  // user's stated condition (e.g., melanoma trials in a breast-cancer search).
+  // The headline agreement % then reflects what users would actually see,
+  // not the model's behavior on stress-test inputs.
+  const inScope = (r) => !productionMode || !r.trial.outOfScope
+  const withExpected = done.filter(r => r.trial.expected && inScope(r))
   const matches = withExpected.filter(r => r.verdict === expectedBinary(r.trial.expected)).length
   const agreementPct = withExpected.length ? Math.round((matches / withExpected.length) * 100) : null
+  const hiddenCount = done.filter(r => r.trial.outOfScope).length
 
   const canRun = status === 'ready' && !running
 
@@ -678,6 +696,18 @@ English translation:`
             />
             translate to English first
           </label>
+          <label
+            className="inline-flex items-center gap-1.5 text-[12px] text-parchment-900 cursor-pointer"
+            title="Production mode: agreement % only counts trials the CT.gov API would actually return for the patient's condition. Out-of-scope stress-test trials (different cancers, unrelated diseases) are still classified and shown but excluded from the headline."
+          >
+            <input
+              type="checkbox"
+              checked={productionMode}
+              onChange={e => setProductionMode(e.target.checked)}
+              className="accent-iris-500"
+            />
+            production-realistic agreement
+          </label>
           <label className="inline-flex items-center gap-2 text-[12px] text-parchment-700">
             Eligibility max chars
             <input
@@ -734,8 +764,18 @@ English translation:`
         {agreementPct != null && !running && (
           <div className="font-mono text-[11px] text-parchment-700 mt-3 px-3 py-2.5 bg-iris-50 border border-iris-100 rounded-lg leading-relaxed">
             <strong className="text-iris-700">Agreement with expected:</strong>{' '}
-            {matches} / {withExpected.length} ({agreementPct}%) — useful as a smoke test on a labeled
-            held-out set. Below ~80% means the prompt or model needs work before this drives sort order.
+            {matches} / {withExpected.length} ({agreementPct}%)
+            {productionMode && hiddenCount > 0 && (
+              <span className="text-parchment-700">
+                {' '}— {hiddenCount} out-of-scope trial{hiddenCount !== 1 ? 's' : ''} excluded
+                (the CT.gov API would not return them for this condition).
+              </span>
+            )}
+            {!productionMode && (
+              <span className="text-parchment-700">
+                {' '}— includes out-of-scope stress-test trials. Toggle <em>production-realistic</em> for the user-facing number.
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -753,7 +793,7 @@ English translation:`
   )
 }
 
-function buildMarkdownReport({ userDesc, translatedDesc, translateFirst, promptTemplate, eligMax, modelLabel, results, stats }) {
+function buildMarkdownReport({ userDesc, translatedDesc, translateFirst, productionMode, hiddenCount, promptTemplate, eligMax, modelLabel, results, stats }) {
   const escape = (s) => String(s ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ').trim()
   const truncate = (s, n) => {
     const t = escape(s)
@@ -781,7 +821,10 @@ function buildMarkdownReport({ userDesc, translatedDesc, translateFirst, promptT
   lines.push(`| Max latency | ${stats.maxLat}ms |`)
   lines.push(`| Parse rate | ${stats.parseRate}% (${stats.parseFails} fails) |`)
   if (stats.agreementPct != null) {
-    lines.push(`| Agreement | ${stats.matches} / ${stats.withExpected} (${stats.agreementPct}%) |`)
+    const note = productionMode
+      ? ` — ${hiddenCount || 0} out-of-scope trial(s) excluded`
+      : ' — includes out-of-scope stress-test trials'
+    lines.push(`| Agreement | ${stats.matches} / ${stats.withExpected} (${stats.agreementPct}%)${note} |`)
   }
   lines.push('')
   lines.push('## Results')
