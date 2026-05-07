@@ -1,7 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGeocode } from '../hooks/useGeocode'
 import { useClinicalTrials } from '../hooks/useClinicalTrials'
 import { useSimplifier } from '../hooks/useSimplifier'
+import { useNLP } from '../hooks/useNLP'
+import { useClassifier } from '../hooks/useClassifier'
+import { NLP_MODELS } from '../utils/nlpModels'
+import { buildClassifyPrompt, parseVerdict } from '../utils/classifyTrial'
 import ResultCard from './ResultCard'
 import TriageRow from './TriageRow'
 import MobileSheet from './MobileSheet'
@@ -10,6 +14,20 @@ import {
   outputLanguageFor,
   SUPPORTED_SIMPLIFICATION_LANGUAGES,
 } from '../utils/detectInputLanguage'
+
+const NLP_CONSENT_KEY = 'iris_nlp_enabled'
+
+// Build a synthetic patient description from extracted fields when the user
+// came in via structured form but had previously used NL (so consent exists).
+function patientDescFromFields(fields) {
+  if (!fields) return null
+  const parts = []
+  if (fields.age != null) parts.push(`${fields.age}-year-old`)
+  if (fields.sex && fields.sex !== 'ALL') parts.push(fields.sex.toLowerCase())
+  if (fields.condition) parts.push(`with ${fields.condition}`)
+  if (fields.location) parts.push(`in ${fields.location}`)
+  return parts.length > 0 ? parts.join(' ') : null
+}
 
 const EAGER_BATCH_SIZE = 5
 const MOBILE_BREAKPOINT_PX = 820
@@ -65,6 +83,42 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
   const [sheetOpen, setSheetOpen] = useState(false)
   const [compareSet, setCompareSet] = useState(() => new Set())
 
+  // ─── Stage-1 classification ───────────────────────────────────────
+  // Only fires when the user previously consented to the on-device model
+  // (iris_nlp_enabled localStorage key, set during NL flow). Structured-
+  // form-only sessions skip classification entirely — no auto-load,
+  // no covert worker initialization. Verdicts surface as fit dots in
+  // TriageRow + a "evaluating fit · X of N" caption in the toolbar.
+  const nlp = useNLP()
+  const { classifyOne } = useClassifier()
+  const [classifications, setClassifications] = useState(new Map())
+  const [classifyProgress, setClassifyProgress] = useState({ done: 0, total: 0 })
+  const classifiedRef = useRef(new Set())
+  const cancelClassifyRef = useRef(null)
+
+  const consented = useMemo(() => {
+    try { return localStorage.getItem(NLP_CONSENT_KEY) === 'true' } catch { return false }
+  }, [])
+  const patientDesc = userDescription || patientDescFromFields(extractedFields)
+  const canClassify = consented && nlp.webGPUSupported && Boolean(patientDesc)
+
+  // Idempotent: worker fast-returns 'ready' if engine already loaded
+  // (e.g. NL extraction loaded it earlier this session).
+  useEffect(() => {
+    if (!canClassify) return
+    if (nlp.status !== 'idle') return
+    const model = NLP_MODELS[modelKey] ?? NLP_MODELS.gemma
+    nlp.load(model.id, { isThinking: model.isThinking, chatOpts: model.chatOpts })
+  }, [canClassify, nlp.status, modelKey, nlp])
+
+  // Reset classification state when the search itself changes.
+  useEffect(() => {
+    classifiedRef.current = new Set()
+    setClassifications(new Map())
+    setClassifyProgress({ done: 0, total: 0 })
+    if (cancelClassifyRef.current) cancelClassifyRef.current()
+  }, [searchParams])
+
   function toggleCompare(nctId) {
     setCompareSet(prev => {
       const next = new Set(prev)
@@ -92,6 +146,49 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
     setSelectedNctId(nctId)
     if (isMobile) setSheetOpen(true)
   }
+
+  // Classify newly-arrived trials. Pagination appends → classify only new
+  // NCTs. Engine-not-loaded check is via nlp.status !== 'ready'.
+  const trialKeyAll = allTrials.map(t => t.nctId).join(',')
+  useEffect(() => {
+    if (!canClassify || nlp.status !== 'ready' || !patientDesc) return
+    const newTrials = allTrials.filter(t => !classifiedRef.current.has(t.nctId))
+    if (newTrials.length === 0) return
+    for (const t of newTrials) classifiedRef.current.add(t.nctId)
+
+    setClassifyProgress(prev => ({ done: prev.done, total: prev.total + newTrials.length }))
+
+    let cancelled = false
+    cancelClassifyRef.current = () => { cancelled = true }
+    ;(async () => {
+      for (const trial of newTrials) {
+        if (cancelled) return
+        try {
+          const prompt = buildClassifyPrompt(patientDesc, trial)
+          const { raw } = await classifyOne(prompt)
+          const parsed = parseVerdict(raw)
+          if (cancelled) return
+          setClassifications(prev => {
+            const next = new Map(prev)
+            next.set(trial.nctId, { status: 'done', ...parsed, raw })
+            return next
+          })
+        } catch (err) {
+          if (cancelled) return
+          setClassifications(prev => {
+            const next = new Map(prev)
+            next.set(trial.nctId, { status: 'done', verdict: 'PARSE_FAIL', reason: err?.message ?? 'classify error' })
+            return next
+          })
+        } finally {
+          if (!cancelled) {
+            setClassifyProgress(prev => ({ ...prev, done: prev.done + 1 }))
+          }
+        }
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canClassify, nlp.status, patientDesc, trialKeyAll])
 
   // Fire when the result set changes — keyed on the first 5 NCT IDs.
   // Using searchParams as the key would fire too early (before data arrives);
@@ -184,6 +281,7 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
       <ResultsToolbar
         totalCount={totalCount}
         searchParams={searchParams}
+        classifyProgress={canClassify ? classifyProgress : null}
       />
 
       <div
@@ -204,6 +302,8 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
                   comparing={compareSet.has(trial.nctId)}
                   onToggleCompare={toggleCompare}
                   compareDisabled={compareSet.size >= 3}
+                  classification={canClassify ? classifications.get(trial.nctId) : null}
+                  classifyPending={canClassify && !classifications.has(trial.nctId)}
                 />
               </li>
             ))}
@@ -269,7 +369,7 @@ const SORT_OPTIONS = [
   { id: 'recent',   label: 'Most recent',  disabled: true, title: 'Sort wiring coming in a follow-up' },
 ]
 
-function ResultsToolbar({ totalCount, searchParams }) {
+function ResultsToolbar({ totalCount, searchParams, classifyProgress }) {
   const [sort, setSort] = useState('recent')
 
   const summaryParts = [`${totalCount.toLocaleString()} trial${totalCount !== 1 ? 's' : ''}`]
@@ -290,6 +390,14 @@ function ResultsToolbar({ totalCount, searchParams }) {
             {part}
           </span>
         ))}
+        {classifyProgress && classifyProgress.total > 0 && (
+          <span className="ml-3 text-iris-700">
+            <span className="text-parchment-300 mr-1.5" aria-hidden="true">·</span>
+            {classifyProgress.done < classifyProgress.total
+              ? `evaluating fit · ${classifyProgress.done} of ${classifyProgress.total}`
+              : `fit evaluated for ${classifyProgress.total}`}
+          </span>
+        )}
       </p>
       <div className="hidden sm:flex items-center gap-1" role="group" aria-label="Sort results">
         <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-parchment-700 mr-2">
