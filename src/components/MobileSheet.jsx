@@ -1,8 +1,18 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 export default function MobileSheet({ open, onClose, children, label }) {
+  const closeButtonRef = useRef(null)
+  // Track who had focus before the sheet opened so we can hand it back on
+  // close — without this, focus drops to <body> and keyboard users lose
+  // their place in the list.
+  const previousFocusRef = useRef(null)
+
   useEffect(() => {
     if (!open) return
+
+    previousFocusRef.current = document.activeElement
+    closeButtonRef.current?.focus()
+
     const onKey = (e) => {
       if (e.key === 'Escape') onClose()
     }
@@ -12,6 +22,10 @@ export default function MobileSheet({ open, onClose, children, label }) {
     return () => {
       document.removeEventListener('keydown', onKey)
       document.body.style.overflow = prevOverflow
+      const prev = previousFocusRef.current
+      if (prev && typeof prev.focus === 'function') {
+        prev.focus()
+      }
     }
   }, [open, onClose])
 
@@ -41,9 +55,10 @@ export default function MobileSheet({ open, onClose, children, label }) {
         </div>
         <div className="px-4 pb-2 flex justify-end shrink-0">
           <button
+            ref={closeButtonRef}
             type="button"
             onClick={onClose}
-            className="text-[13px] text-parchment-700 hover:text-parchment-950 px-1.5 py-1"
+            className="text-[13px] text-parchment-700 hover:text-parchment-950 px-1.5 py-1 focus:outline-none focus:ring-2 focus:ring-iris-500 rounded"
           >
             Close
           </button>

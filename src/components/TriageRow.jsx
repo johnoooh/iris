@@ -41,8 +41,8 @@ export default function TriageRow({
         aria-current={selected ? 'true' : undefined}
         className="flex-1 text-left px-4 py-[18px] flex flex-col gap-1.5 cursor-pointer min-w-0"
       >
-        <span
-          className="font-serif font-semibold text-[14.5px] text-parchment-950 leading-snug overflow-hidden"
+        <h3
+          className="font-serif font-semibold text-[14.5px] text-parchment-950 leading-snug overflow-hidden m-0"
           style={{
             display: '-webkit-box',
             WebkitLineClamp: 2,
@@ -50,7 +50,7 @@ export default function TriageRow({
           }}
         >
           {trial.title}
-        </span>
+        </h3>
         <span className="font-mono text-[11px] text-parchment-700 flex flex-wrap gap-x-1.5">
           {nearest?.distanceMi != null && <span>{nearest.distanceMi} mi</span>}
           {nearest?.distanceMi != null && phase && <span aria-hidden="true">·</span>}
