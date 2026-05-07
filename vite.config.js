@@ -10,6 +10,11 @@ const nodeMajor = Number(process.versions.node.split('.')[0])
 export default defineConfig({
   plugins: [react()],
   base: '/iris/',
+  // Pin dev server to a fixed port + strictPort so a flaky restart
+  // doesn't bounce to a different port. WebLLM caches the model in
+  // IndexedDB keyed by origin; a port change forces a fresh ~1.3 GB
+  // download.
+  server: { port: 5173, strictPort: true },
   test: {
     globals: true,
     environment: 'jsdom',
