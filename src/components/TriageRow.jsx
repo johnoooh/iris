@@ -15,18 +15,23 @@ function FitDot({ classification, pending }) {
   if (!classification) return null
 
   const isLikely = classification.verdict === 'LIKELY'
+  // Fold the model's reason into aria-label so SR/keyboard users get the
+  // same context as a sighted hover. title alone wasn't reaching either
+  // group reliably (title isn't announced by most screen readers, isn't
+  // keyboard-discoverable). Same string in both attrs means verdict +
+  // reason are the unit a user perceives, not just the verdict.
+  const label = isLikely
+    ? `Likely fit — ${classification.reason || 'matches your description'}`
+    : `Less likely fit — ${classification.reason || 'may not match'}`
   return (
     <span
+      role="img"
       className={[
         'inline-block w-2 h-2 rounded-full mr-1 shrink-0',
         isLikely ? 'bg-iris-500' : 'border border-parchment-400',
       ].join(' ')}
-      title={
-        isLikely
-          ? `Likely fit — ${classification.reason || 'matches your description'}`
-          : `Less likely fit — ${classification.reason || 'may not match'}`
-      }
-      aria-label={isLikely ? 'Likely fit' : 'Less likely fit'}
+      title={label}
+      aria-label={label}
     />
   )
 }

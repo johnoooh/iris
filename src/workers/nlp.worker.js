@@ -130,6 +130,35 @@ self.onmessage = async (event) => {
     return
   }
 
+  if (type === 'translate') {
+    if (!engine) {
+      self.postMessage({ type: 'translate_error', taskId, message: 'Engine not loaded' })
+      return
+    }
+    try {
+      const t0 = Date.now()
+      if (typeof engine.resetChat === 'function') {
+        try { await engine.resetChat() } catch { /* best effort */ }
+      }
+      // Translation typically needs more headroom than classification (one
+      // verdict word + reason fits in 80; a paraphrased clinical sentence
+      // can run 100-200 tokens for verbose languages). Same low temperature
+      // since we want fidelity, not creativity.
+      const request = {
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 200,
+        temperature: 0.1,
+      }
+      if (isThinkingModel) request.extra_body = { enable_thinking: false }
+      const reply = await engine.chat.completions.create(request)
+      const raw = reply.choices?.[0]?.message?.content ?? ''
+      self.postMessage({ type: 'translate_done', taskId, raw, latencyMs: Date.now() - t0 })
+    } catch (err) {
+      self.postMessage({ type: 'translate_error', taskId, message: err?.message ?? String(err) })
+    }
+    return
+  }
+
   if (type === 'classify') {
     if (!engine) {
       self.postMessage({ type: 'classify_error', taskId, message: 'Engine not loaded' })

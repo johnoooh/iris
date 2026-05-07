@@ -4,6 +4,7 @@ import { useClinicalTrials } from '../hooks/useClinicalTrials'
 import { useSimplifier } from '../hooks/useSimplifier'
 import { useNLP } from '../hooks/useNLP'
 import { useClassifier } from '../hooks/useClassifier'
+import { useIsMobile } from '../hooks/useIsMobile'
 import { NLP_MODELS } from '../utils/nlpModels'
 import { buildClassifyPrompt, parseVerdict } from '../utils/classifyTrial'
 import ResultCard from './ResultCard'
@@ -16,6 +17,14 @@ import {
 } from '../utils/detectInputLanguage'
 
 const NLP_CONSENT_KEY = 'iris_nlp_enabled'
+
+// Stage-1 classification is wired end-to-end (worker, hook, harness) but
+// not yet surfaced in the in-app results UI. Reason: without sort wiring
+// the fit dots don't drive any user-visible behavior — they're just
+// decoration. The harness at ?test=classify still uses the full pipeline
+// for prompt iteration and validation. Flip this to true once "Best fit"
+// sort is wired so the dots become actionable.
+const ENABLE_CLASSIFY_IN_RESULTS = false
 
 // Build a synthetic patient description from extracted fields when the user
 // came in via structured form but had previously used NL (so consent exists).
@@ -30,26 +39,7 @@ function patientDescFromFields(fields) {
 }
 
 const EAGER_BATCH_SIZE = 5
-const MOBILE_BREAKPOINT_PX = 820
 const LIST_WIDTH_PX = 400
-
-// matchMedia (not 'resize'): iOS Safari fires 'resize' inconsistently on
-// rotation; matchMedia.change is the reliable signal. Also catches iPad
-// split-screen and browser-window mode switches without a manual resize.
-function useIsMobile() {
-  const query = `(max-width: ${MOBILE_BREAKPOINT_PX}px)`
-  const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== 'undefined' && window.matchMedia(query).matches
-  )
-  useEffect(() => {
-    const mq = window.matchMedia(query)
-    const onChange = (e) => setIsMobile(e.matches)
-    mq.addEventListener('change', onChange)
-    return () => mq.removeEventListener('change', onChange)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-  return isMobile
-}
 
 export default function ResultsList({ searchParams, modelKey, userDescription, extractedFields }) {
   // Phase 3 simplification only ships for English and Spanish — those are
@@ -105,8 +95,11 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
   const consented = useMemo(() => {
     try { return localStorage.getItem(NLP_CONSENT_KEY) === 'true' } catch { return false }
   }, [])
-  const patientDesc = userDescription || patientDescFromFields(extractedFields)
-  const canClassify = consented && nlp.webGPUSupported && Boolean(patientDesc)
+  const patientDesc = useMemo(
+    () => userDescription || patientDescFromFields(extractedFields),
+    [userDescription, extractedFields]
+  )
+  const canClassify = ENABLE_CLASSIFY_IN_RESULTS && consented && nlp.webGPUSupported && Boolean(patientDesc)
 
   // Idempotent: worker fast-returns 'ready' if engine already loaded
   // (e.g. NL extraction loaded it earlier this session). Destructure
