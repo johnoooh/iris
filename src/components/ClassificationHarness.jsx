@@ -300,14 +300,16 @@ Exclusion Criteria:
   },
 ]
 
-const DEFAULT_PROMPT = `You are evaluating clinical trial fit.
+const DEFAULT_PROMPT = `You are evaluating clinical trial fit. Be conservative. LIKELY is reserved for slam-dunk matches where every gating criterion in the eligibility is clearly met by the user description. If the trial requires a specific subtype, biomarker, stage, mutation, prior treatment, or measurement that the user has NOT explicitly confirmed, the verdict is POSSIBLE — even if the broad condition matches. UNLIKELY is for clear mismatches (wrong condition, wrong sex, wrong age range, excluded comorbidity).
 
 User: {{user}}
 Trial title: {{title}}
 Eligibility (excerpt): {{eligibility}}
 
-Reply on one line, exactly: VERDICT | one-sentence reason
-where VERDICT is LIKELY, POSSIBLE, or UNLIKELY.`
+Reply on EXACTLY one line in this format:
+VERDICT | one-sentence reason
+
+VERDICT must be LIKELY, POSSIBLE, or UNLIKELY. The reason is required.`
 
 const DEFAULT_USER_DESC = "I'm 58 years old with breast cancer in Boston"
 
