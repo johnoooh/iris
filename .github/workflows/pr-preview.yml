@@ -1,0 +1,62 @@
+name: PR preview deploy
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+# Per-PR preview at https://USER.github.io/iris/pr-NUM/ — built with the
+# matching base path so all asset URLs resolve at the preview origin.
+# Cleanup runs separately on PR close (pr-preview-cleanup.yml).
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: pr-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build-deploy:
+    # Forks won't have write access to the gh-pages branch — skip them.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build with PR base path
+        run: npm run build
+        env:
+          BASE_PATH: /iris/pr-${{ github.event.pull_request.number }}/
+
+      - name: Deploy preview to gh-pages/pr-NUM/
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          publish_branch: gh-pages
+          destination_dir: pr-${{ github.event.pull_request.number }}
+          keep_files: false
+          commit_message: 'preview: pr-${{ github.event.pull_request.number }} ${{ github.event.pull_request.title }}'
+
+      # Sticky comment on the PR with the preview URL. Replaced (not
+      # appended) on each push so the comment thread stays clean.
+      - name: Comment preview URL
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: pr-preview
+          message: |
+            ### 🔍 Preview deployed
+
+            **URL:** https://${{ github.repository_owner }}.github.io/iris/pr-${{ github.event.pull_request.number }}/
+
+            Built from `${{ github.event.pull_request.head.sha }}`. Updates on every push to this PR.
+            The preview is removed automatically when the PR is closed or merged.

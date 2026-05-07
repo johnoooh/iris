@@ -5,21 +5,23 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Modern GitHub-Actions-native Pages flow: build the static site as an
-# artifact, then deploy it via actions/deploy-pages. No gh-pages branch,
-# no Jekyll. Requires repo Settings → Pages → Source = "GitHub Actions".
+# Production deploy of main → root of the gh-pages branch. This branch-
+# based deploy mode is REQUIRED to support per-PR subpath previews (see
+# pr-preview.yml). The previous actions/deploy-pages flow couldn't
+# coexist with subpath previews because GitHub Pages source is one mode
+# at a time — Actions OR a branch.
+#
+# Repo setting required (one-time, manual): Settings → Pages → Source →
+# "Deploy from a branch" → gh-pages / (root).
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
-# Allow only one concurrent deployment, but let an in-progress run finish.
 concurrency:
-  group: pages
+  group: pages-prod
   cancel-in-progress: false
 
 jobs:
-  build:
+  build-deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,22 +39,18 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          BASE_PATH: /iris/
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+      # peaceiris/actions-gh-pages publishes ./dist into the root of the
+      # gh-pages branch. keep_files: true preserves any existing pr-NUM/
+      # subdirectories from in-flight preview deploys.
+      - name: Deploy to gh-pages root
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: ./dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          publish_branch: gh-pages
+          destination_dir: .
+          keep_files: true
+          commit_message: 'deploy: ${{ github.event.head_commit.message }}'

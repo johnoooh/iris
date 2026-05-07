@@ -7,9 +7,18 @@ import react from '@vitejs/plugin-react'
 // hitting EPIPE here). Emit the flag only on Node 22+.
 const nodeMajor = Number(process.versions.node.split('.')[0])
 
+// BASE_PATH lets CI override the Vite base for per-PR preview deploys
+// (e.g. /iris/pr-23/). Defaults to /iris/ so prod and local dev are
+// unchanged. Always ends with a trailing slash — Vite requires it.
+const basePath = (() => {
+  const raw = process.env.BASE_PATH
+  if (!raw) return '/iris/'
+  return raw.endsWith('/') ? raw : `${raw}/`
+})()
+
 export default defineConfig({
   plugins: [react()],
-  base: '/iris/',
+  base: basePath,
   test: {
     globals: true,
     environment: 'jsdom',
