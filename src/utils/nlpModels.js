@@ -17,6 +17,14 @@ export const NLP_MODELS = {
     // <think>…</think> block before the answer, which breaks JSON parsing.
     isThinking: true,
   },
+  llama32: {
+    id: 'Llama-3.2-3B-Instruct-q4f16_1-MLC',
+    label: 'Llama 3.2 3B',
+    // q4f16_1 instead of q4f32_1: smaller (~1.9 GB vs ~2.4 GB) and faster on
+    // most GPUs with effectively no quality difference for instruction tasks.
+    sizeLabel: '~1.9 GB',
+    isThinking: false,
+  },
 }
 
 export const DEFAULT_MODEL_KEY = 'gemma'
