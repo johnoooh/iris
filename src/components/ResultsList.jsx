@@ -41,7 +41,23 @@ function patientDescFromFields(fields) {
 const EAGER_BATCH_SIZE = 5
 const LIST_WIDTH_PX = 400
 
-export default function ResultsList({ searchParams, modelKey, userDescription, extractedFields }) {
+// EMPTY_SET is referenced as a default for compareSet prop so tests + any
+// caller that omits compare props still get a no-op compare experience.
+const EMPTY_SET = new Set()
+
+export default function ResultsList({
+  searchParams,
+  modelKey,
+  userDescription,
+  extractedFields,
+  // Compare state lifted to App so it survives search refinements.
+  // Defaults make the component usable in tests / standalone without
+  // requiring callers to wire all four props.
+  compareSet = EMPTY_SET,
+  compareLimit = 3,
+  onToggleCompare = null,
+  onClearCompare = () => {},
+}) {
   // Phase 3 simplification only ships for English and Spanish — those are
   // the languages we've verified the local model produces accurately.
   // Other languages get a "use browser translate" hint instead.
@@ -83,7 +99,13 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
   const isMobile = useIsMobile()
   const [selectedNctId, setSelectedNctId] = useState(null)
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [compareSet, setCompareSet] = useState(() => new Set())
+
+  // Stale pins — NCTs in compareSet that aren't in the current result
+  // page. Surfaced as a small badge in the sticky CompareBar so users
+  // know their pin is preserved even if a refined search dropped it
+  // from view.
+  const visibleCompareIds = new Set(allTrials.map(t => t.nctId).filter(id => compareSet.has(id)))
+  const staleCompareCount = compareSet.size - visibleCompareIds.size
 
   // ─── Stage-1 classification ───────────────────────────────────────
   // Only fires when the user previously consented to the on-device model
@@ -138,15 +160,6 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
     simplifier.cancelPending()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, patientDesc])
-
-  function toggleCompare(nctId) {
-    setCompareSet(prev => {
-      const next = new Set(prev)
-      if (next.has(nctId)) next.delete(nctId)
-      else if (next.size < 3) next.add(nctId)
-      return next
-    })
-  }
 
   // Default selection to the first trial when results arrive (desktop only —
   // on mobile we wait for an explicit tap to open the sheet).
@@ -340,12 +353,12 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
       />
 
       <div
-        className="flex-1 grid min-h-0 overflow-hidden"
+        className="iris-results-grid flex-1 grid min-h-0 overflow-hidden"
         style={{
           gridTemplateColumns: isMobile ? '1fr' : `${LIST_WIDTH_PX}px 1fr`,
         }}
       >
-        <div className="overflow-auto bg-parchment-100 border-r border-parchment-200 flex flex-col">
+        <div className="iris-list-pane no-print overflow-auto bg-parchment-100 border-r border-parchment-200 flex flex-col">
           <ul className="flex flex-col">
             {allTrials.map(trial => (
               <li key={trial.nctId} className="border-b border-parchment-200">
@@ -355,8 +368,8 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
                   selected={!isMobile && trial.nctId === selectedNctId}
                   onSelect={onSelectTrial}
                   comparing={compareSet.has(trial.nctId)}
-                  onToggleCompare={toggleCompare}
-                  compareDisabled={compareSet.size >= 3}
+                  onToggleCompare={onToggleCompare}
+                  compareDisabled={compareSet.size >= compareLimit}
                   classification={canClassify ? classifications.get(trial.nctId) : null}
                   classifyPending={canClassify && !classifications.has(trial.nctId)}
                 />
@@ -375,7 +388,7 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
         </div>
 
         {!isMobile && (
-          <div className="overflow-auto bg-white" aria-live="polite">
+          <div className="iris-detail-pane overflow-auto bg-white" aria-live="polite">
             {selected && renderDetail(selected)}
           </div>
         )}
@@ -384,7 +397,9 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
       {compareSet.size > 0 && (
         <CompareBar
           count={compareSet.size}
-          onClear={() => setCompareSet(new Set())}
+          staleCount={staleCompareCount}
+          onClear={onClearCompare}
+          onCompare={() => { window.location.hash = '/compare' }}
         />
       )}
 
@@ -435,7 +450,7 @@ function ResultsToolbar({ totalCount, searchParams, classifyProgress }) {
   }
 
   return (
-    <div className="px-4 sm:px-6 py-3 border-b border-parchment-200 flex flex-wrap items-center gap-x-6 gap-y-2">
+    <div className="no-print px-4 sm:px-6 py-3 border-b border-parchment-200 flex flex-wrap items-center gap-x-6 gap-y-2">
       <p className="font-mono text-[11px] text-parchment-700 leading-snug">
         {summaryParts.map((part, i) => (
           <span key={i}>
@@ -456,16 +471,24 @@ function ResultsToolbar({ totalCount, searchParams, classifyProgress }) {
   )
 }
 
-function CompareBar({ count, onClear }) {
+function CompareBar({ count, staleCount = 0, onClear, onCompare }) {
   return (
     <div
-      className="border-t border-parchment-200 bg-white px-4 py-2.5 flex items-center justify-between gap-3 shrink-0"
+      className="no-print border-t border-parchment-200 bg-white px-4 py-2.5 flex items-center justify-between gap-3 shrink-0"
       style={{ boxShadow: '0 -4px 16px rgba(28, 24, 18, 0.06)' }}
       role="region"
       aria-label="Compare selection"
     >
       <span className="text-[13px] text-parchment-900">
         <strong className="font-semibold">{count}</strong> in compare
+        {staleCount > 0 && (
+          <span
+            className="ml-2 font-mono text-[11px] text-parchment-700"
+            title={`${staleCount} pinned trial${staleCount === 1 ? "" : "s"} not in the current results — still saved`}
+          >
+            ({staleCount} not in current results)
+          </span>
+        )}
       </span>
       <div className="flex items-center gap-2">
         <button
@@ -477,9 +500,8 @@ function CompareBar({ count, onClear }) {
         </button>
         <button
           type="button"
-          disabled
-          title="Compare view coming soon"
-          className="bg-iris-600 text-white px-4 py-1.5 rounded-md text-[13px] font-semibold opacity-60 cursor-not-allowed"
+          onClick={onCompare}
+          className="bg-iris-600 text-white px-4 py-1.5 rounded-md text-[13px] font-semibold hover:bg-iris-700"
         >
           Compare →
         </button>

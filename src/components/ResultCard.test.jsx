@@ -100,7 +100,9 @@ describe('ResultCard — Phase 3 simplification', () => {
     }
     render(<ResultCard trial={trial} coords={null} simplification={simplification} />)
     expect(screen.getByText('This study tests')).toBeInTheDocument()
-    expect(screen.getByText(/Generating plain-language summary/i)).toBeInTheDocument()
+    // The "generating…" caption used to render here; it now lives only in
+    // the parent's PipelineCaption (pane mode). Once tokens stream the
+    // user sees the actual text, so the caption is gone.
   })
 
   it('renders both sections when both have streamed', () => {

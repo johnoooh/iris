@@ -112,7 +112,7 @@ export default function TriageRow({
             type="checkbox"
             checked={comparing}
             disabled={!comparing && compareDisabled}
-            onChange={() => onToggleCompare(trial.nctId)}
+            onChange={() => onToggleCompare(trial)}
             aria-label={comparing ? `Remove ${trial.title} from compare` : `Add ${trial.title} to compare`}
             className="w-[18px] h-[18px] accent-iris-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
           />

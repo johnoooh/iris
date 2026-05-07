@@ -1,6 +1,6 @@
 export default function Footer() {
   return (
-    <footer className="border-t border-parchment-200 px-6 py-5 mt-8 bg-parchment-50">
+    <footer className="no-print border-t border-parchment-200 px-6 py-5 mt-8 bg-parchment-50">
       <div className="max-w-3xl space-y-3">
         <p className="text-xs text-parchment-800 leading-relaxed">
           IRIS is not medical advice. Always discuss clinical trial options with your healthcare
@@ -31,7 +31,7 @@ export default function Footer() {
           </summary>
           <p className="mt-2 italic leading-relaxed max-w-2xl">
             Named for{' '}
-            <strong className="not-italic font-semibold">Iris Long (1934–2026)</strong>, a
+            <strong className="not-italic font-semibold">Iris Long (1933–2026)</strong>, a
             pharmaceutical chemist and ACT-UP activist who dedicated her career to making clinical
             trial information accessible to the people who needed it most.
           </p>
