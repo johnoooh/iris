@@ -190,22 +190,36 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canClassify, nlp.status, patientDesc, trialKeyAll])
 
-  // Fire when the result set changes — keyed on the first 5 NCT IDs.
-  // Using searchParams as the key would fire too early (before data arrives);
-  // using allTrials would re-fire on every pagination append.
+  // Reset the simplifier when the result set changes (new search). The
+  // per-trial enqueue happens below in the selected-trial effect.
   const eagerKey = allTrials.slice(0, EAGER_BATCH_SIZE).map(t => t.nctId).join(',')
   useEffect(() => {
     simplifier.cancelPending()
     simplifier.resetCache()
-    if (allTrials.length === 0) return
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eagerKey])
+
+  // Per Handoff Phase 3 step 6: stage-2 simplification only fires for the
+  // currently-selected trial. Critically, it WAITS for stage-1
+  // classification to finish first — otherwise both compete for the
+  // single-threaded worker, the classifier appears to stall, and the
+  // simplifier (running first) produces noisier output under contention.
+  // For structured-form-only sessions canClassify is false and
+  // classifyProgress.total stays 0, so the gate falls through to "true"
+  // and simplification runs immediately on selection.
+  const classifyDone = !canClassify || (
+    classifyProgress.total > 0 && classifyProgress.done >= classifyProgress.total
+  )
+  useEffect(() => {
     if (!simplificationSupported) return
-    const eager = allTrials.slice(0, EAGER_BATCH_SIZE)
-    for (const t of eager) simplifier.enqueueSummarize(t, { outputLanguage })
+    if (!selected) return
+    if (!classifyDone) return
+    simplifier.enqueueSummarize(selected, { outputLanguage })
     if (extractedFields) {
-      for (const t of eager) simplifier.enqueueAssessFit(t, { outputLanguage })
+      simplifier.enqueueAssessFit(selected, { outputLanguage })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eagerKey, simplificationSupported, outputLanguage])
+  }, [selected?.nctId, simplificationSupported, outputLanguage, classifyDone])
 
   if (isLoading) {
     return (

@@ -184,7 +184,13 @@ self.onmessage = async (event) => {
         // its hedging language ("may", "might") doesn't collapse into a
         // single deterministic phrase across trials.
         temperature: type === 'summarize' ? 0.1 : 0.2,
-        frequency_penalty: type === 'summarize' ? 0.3 : 0,
+        // Bumped from 0.3 → 0.6 because Gemma 2 2B was hitting degenerate
+        // loops on the simplify prompt — emitting strings of "##" header
+        // markers ("############# ## ## ## …") instead of the body content.
+        // Higher frequency penalty discourages the same n-gram from
+        // re-firing, breaking the loop. Assess-fit stays at 0 so its
+        // hedging language ("may", "might") doesn't get penalized.
+        frequency_penalty: type === 'summarize' ? 0.6 : 0,
         stream: true,
       }
       if (isThinkingModel) request.extra_body = { enable_thinking: false }
