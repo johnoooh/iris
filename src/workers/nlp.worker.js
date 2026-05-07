@@ -108,6 +108,34 @@ self.onmessage = async (event) => {
     return
   }
 
+  if (type === 'classify') {
+    if (!engine) {
+      self.postMessage({ type: 'classify_error', taskId, message: 'Engine not loaded' })
+      return
+    }
+    try {
+      const t0 = Date.now()
+      // Reset KV cache between classifications so they're independent.
+      if (typeof engine.resetChat === 'function') {
+        try { await engine.resetChat() } catch { /* best effort */ }
+      }
+      const request = {
+        messages: [{ role: 'user', content: prompt }],
+        // Stage-1 verdict + one-sentence reason fits comfortably in ~60 tokens.
+        // Generous headroom (80) covers preamble drift from the smaller models.
+        max_tokens: 80,
+        temperature: 0.1,
+      }
+      if (isThinkingModel) request.extra_body = { enable_thinking: false }
+      const reply = await engine.chat.completions.create(request)
+      const raw = reply.choices?.[0]?.message?.content ?? ''
+      self.postMessage({ type: 'classify_done', taskId, raw, latencyMs: Date.now() - t0 })
+    } catch (err) {
+      self.postMessage({ type: 'classify_error', taskId, message: err?.message ?? String(err) })
+    }
+    return
+  }
+
   if (type === 'summarize' || type === 'assess_fit') {
     if (!engine) {
       self.postMessage({ type: 'task_error', taskId, message: 'Engine not loaded' })

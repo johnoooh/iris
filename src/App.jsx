@@ -18,12 +18,15 @@ const NLPTestPanel = import.meta.env.DEV
 const ProdScenarioTestPanel = import.meta.env.DEV
   ? lazy(() => import('./components/ProdScenarioTestPanel'))
   : null
+const ClassificationHarness = import.meta.env.DEV
+  ? lazy(() => import('./components/ClassificationHarness'))
+  : null
 
 function getTestRoute() {
   if (typeof window === 'undefined') return null
   if (!import.meta.env.DEV) return null
   const t = new URLSearchParams(window.location.search).get('test')
-  return t === 'nlp' || t === 'scenarios' ? t : null
+  return t === 'nlp' || t === 'scenarios' || t === 'classify' ? t : null
 }
 
 function IrisApp() {
@@ -41,6 +44,15 @@ function IrisApp() {
       <div className="min-h-screen bg-parchment-50">
         <Suspense fallback={<div className="p-6 text-sm">Loading test panel…</div>}>
           <NLPTestPanel />
+        </Suspense>
+      </div>
+    )
+  }
+  if (testRoute === 'classify' && ClassificationHarness) {
+    return (
+      <div className="min-h-screen bg-parchment-50">
+        <Suspense fallback={<div className="p-6 text-sm">Loading classification harness…</div>}>
+          <ClassificationHarness />
         </Suspense>
       </div>
     )
