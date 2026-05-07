@@ -1,18 +1,18 @@
 export default function Header() {
   return (
-    <header className="border-b border-parchment-200 px-7 py-5 flex items-center justify-between gap-4">
-      <div className="flex items-baseline gap-3.5">
-        <span className="font-serif font-semibold text-[26px] tracking-tight text-parchment-950 lowercase">
+    <header className="border-b border-parchment-200 px-4 sm:px-7 py-4 sm:py-5 flex items-center justify-between gap-3 flex-wrap">
+      <div className="flex items-baseline gap-2 sm:gap-3.5">
+        <span className="font-serif font-semibold text-[22px] sm:text-[26px] tracking-tight text-parchment-950 lowercase">
           iris
         </span>
-        <span className="font-serif italic text-parchment-700 text-[13px]">
+        <span className="font-serif italic text-parchment-700 text-[13px] hidden sm:inline">
           clinical trial finder
         </span>
       </div>
       <div className="flex items-center gap-2.5">
         <span
           title="Your data never leaves the device"
-          className="inline-flex items-center gap-1.5 font-mono text-[11px] text-parchment-700"
+          className="hidden md:inline-flex items-center gap-1.5 font-mono text-[11px] text-parchment-700"
         >
           <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
             <path

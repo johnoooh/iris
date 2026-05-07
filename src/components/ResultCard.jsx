@@ -83,7 +83,7 @@ export default function ResultCard({
 }) {
   const nearest = nearestLocation(trial.locations, coords)
   const wrapperClass = pane
-    ? 'px-7 pt-7 pb-9'
+    ? 'px-5 pt-5 pb-7 sm:px-7 sm:pt-7 sm:pb-9'
     : 'bg-white border border-parchment-400 rounded-lg p-5 mb-3 max-w-3xl'
 
   const sumState = simplification?.summarize

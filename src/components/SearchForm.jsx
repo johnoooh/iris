@@ -65,7 +65,7 @@ export default function SearchForm({ onSearch, prefill }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-parchment-50 border-b border-parchment-200 px-6 py-5">
+    <form onSubmit={handleSubmit} className="bg-parchment-50 border-b border-parchment-200 px-4 sm:px-6 py-4 sm:py-5">
       <h2 className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-parchment-700 mb-4">
         find clinical trials
       </h2>

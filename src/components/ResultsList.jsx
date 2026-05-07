@@ -264,9 +264,9 @@ const PHASE_LABELS = {
 
 const SORT_OPTIONS = [
   { id: 'fit',      label: 'Best fit',     disabled: true, title: 'Available once on-device classification runs' },
-  { id: 'distance', label: 'Distance',     disabled: false },
-  { id: 'phase',    label: 'Phase',        disabled: false },
-  { id: 'recent',   label: 'Most recent',  disabled: false },
+  { id: 'distance', label: 'Distance',     disabled: true, title: 'Sort wiring coming in a follow-up' },
+  { id: 'phase',    label: 'Phase',        disabled: true, title: 'Sort wiring coming in a follow-up' },
+  { id: 'recent',   label: 'Most recent',  disabled: true, title: 'Sort wiring coming in a follow-up' },
 ]
 
 function ResultsToolbar({ totalCount, searchParams }) {
@@ -282,7 +282,7 @@ function ResultsToolbar({ totalCount, searchParams }) {
   }
 
   return (
-    <div className="px-6 py-3 border-b border-parchment-200 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+    <div className="px-4 sm:px-6 py-3 border-b border-parchment-200 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
       <p className="font-mono text-[11px] text-parchment-700 leading-snug">
         {summaryParts.map((part, i) => (
           <span key={i}>
@@ -291,7 +291,7 @@ function ResultsToolbar({ totalCount, searchParams }) {
           </span>
         ))}
       </p>
-      <div className="flex items-center gap-1" role="group" aria-label="Sort results">
+      <div className="hidden sm:flex items-center gap-1" role="group" aria-label="Sort results">
         <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-parchment-700 mr-2">
           sort
         </span>
