@@ -33,14 +33,20 @@ const EAGER_BATCH_SIZE = 5
 const MOBILE_BREAKPOINT_PX = 820
 const LIST_WIDTH_PX = 400
 
+// matchMedia (not 'resize'): iOS Safari fires 'resize' inconsistently on
+// rotation; matchMedia.change is the reliable signal. Also catches iPad
+// split-screen and browser-window mode switches without a manual resize.
 function useIsMobile() {
+  const query = `(max-width: ${MOBILE_BREAKPOINT_PX}px)`
   const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== 'undefined' && window.innerWidth <= MOBILE_BREAKPOINT_PX
+    typeof window !== 'undefined' && window.matchMedia(query).matches
   )
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT_PX)
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
+    const mq = window.matchMedia(query)
+    const onChange = (e) => setIsMobile(e.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   return isMobile
 }
