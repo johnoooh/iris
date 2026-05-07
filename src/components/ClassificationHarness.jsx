@@ -300,16 +300,24 @@ Exclusion Criteria:
   },
 ]
 
-const DEFAULT_PROMPT = `You are evaluating clinical trial fit. Be conservative. LIKELY is reserved for slam-dunk matches where every gating criterion in the eligibility is clearly met by the user description. If the trial requires a specific subtype, biomarker, stage, mutation, prior treatment, or measurement that the user has NOT explicitly confirmed, the verdict is POSSIBLE — even if the broad condition matches. UNLIKELY is for clear mismatches (wrong condition, wrong sex, wrong age range, excluded comorbidity).
+const DEFAULT_PROMPT = `Decide whether to show this clinical trial to the user. The user description is the ONLY thing you know about them — do not assume any subtype, biomarker, stage, treatment history, or comorbidity that the user did not state.
+
+Apply these rules in order:
+1. If the trial studies a condition the user does NOT have → UNLIKELY
+2. If the trial's stated demographic requirements (sex, age range) exclude the user → UNLIKELY
+3. If the trial requires a subtype, biomarker, stage, mutation, or prior treatment the user did not mention → POSSIBLE (the user might still qualify; we just don't know)
+4. If the user clearly meets every stated requirement → LIKELY
+5. Otherwise → POSSIBLE
+
+Do NOT mark UNLIKELY just because the trial has many requirements. UNLIKELY means the user is clearly disqualified, not that information is missing.
 
 User: {{user}}
 Trial title: {{title}}
-Eligibility (excerpt): {{eligibility}}
+Eligibility: {{eligibility}}
 
-Reply on EXACTLY one line in this format:
+Reply on EXACTLY one line:
 VERDICT | one-sentence reason
-
-VERDICT must be LIKELY, POSSIBLE, or UNLIKELY. The reason is required.`
+VERDICT is LIKELY, POSSIBLE, or UNLIKELY.`
 
 const DEFAULT_USER_DESC = "I'm 58 years old with breast cancer in Boston"
 
