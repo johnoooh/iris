@@ -30,18 +30,40 @@ self.onmessage = async (event) => {
     loading = true
     isThinkingModel = Boolean(isThinking)
     try {
-      const { CreateMLCEngine } = await import('@mlc-ai/web-llm')
+      const { CreateMLCEngine /* , prebuiltAppConfig */ } = await import('@mlc-ai/web-llm')
       // CreateMLCEngine signature: (modelId, engineConfig, chatOpts).
       // chatOpts is per-model config override (e.g. sliding_window_size:-1
       // for gemma3, whose prebuilt record sets context_window_size:4096
       // alongside sliding_window_size:512 — the engine rejects both being
       // positive).
+      //
+      // ─── Custom model wiring (stub) ──────────────────────────────────
+      // To serve a fine-tuned model (e.g. a domain-specific LoRA merged
+      // back into Qwen2.5-1.5B), uncomment the appConfig block below and
+      // add a matching entry to nlpModels.js with model_id matching the
+      // one here. The model and model_lib URLs must be CORS-accessible —
+      // HuggingFace Hub serves MLC artifacts with the right headers; a
+      // self-hosted bucket needs explicit CORS config. See
+      // ~/Documents/Github/sevry_vault/Work/ClaudeCode/iris/lora-training-process.md
+      // for the end-to-end LoRA → MLC → WebLLM pipeline.
+      //
+      // const appConfig = {
+      //   model_list: [
+      //     ...prebuiltAppConfig.model_list,
+      //     {
+      //       model: 'https://huggingface.co/USER/iris-classifier-q4f16_1-MLC/resolve/main/',
+      //       model_id: 'iris-classifier-q4f16_1-MLC',
+      //       model_lib: 'https://huggingface.co/USER/iris-classifier-q4f16_1-MLC/resolve/main/iris-classifier-q4f16_1-ctx4k_cs1k-webgpu.wasm',
+      //     },
+      //   ],
+      // }
       engine = await CreateMLCEngine(
         modelId ?? DEFAULT_MODEL_ID,
         {
           initProgressCallback: (progress) => {
             self.postMessage({ type: 'progress', progress })
           },
+          // appConfig, // ← uncomment alongside the block above
         },
         chatOpts ?? undefined,
       )
@@ -108,6 +130,63 @@ self.onmessage = async (event) => {
     return
   }
 
+  if (type === 'translate') {
+    if (!engine) {
+      self.postMessage({ type: 'translate_error', taskId, message: 'Engine not loaded' })
+      return
+    }
+    try {
+      const t0 = Date.now()
+      if (typeof engine.resetChat === 'function') {
+        try { await engine.resetChat() } catch { /* best effort */ }
+      }
+      // Translation typically needs more headroom than classification (one
+      // verdict word + reason fits in 80; a paraphrased clinical sentence
+      // can run 100-200 tokens for verbose languages). Same low temperature
+      // since we want fidelity, not creativity.
+      const request = {
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 200,
+        temperature: 0.1,
+      }
+      if (isThinkingModel) request.extra_body = { enable_thinking: false }
+      const reply = await engine.chat.completions.create(request)
+      const raw = reply.choices?.[0]?.message?.content ?? ''
+      self.postMessage({ type: 'translate_done', taskId, raw, latencyMs: Date.now() - t0 })
+    } catch (err) {
+      self.postMessage({ type: 'translate_error', taskId, message: err?.message ?? String(err) })
+    }
+    return
+  }
+
+  if (type === 'classify') {
+    if (!engine) {
+      self.postMessage({ type: 'classify_error', taskId, message: 'Engine not loaded' })
+      return
+    }
+    try {
+      const t0 = Date.now()
+      // Reset KV cache between classifications so they're independent.
+      if (typeof engine.resetChat === 'function') {
+        try { await engine.resetChat() } catch { /* best effort */ }
+      }
+      const request = {
+        messages: [{ role: 'user', content: prompt }],
+        // Stage-1 verdict + one-sentence reason fits comfortably in ~60 tokens.
+        // Generous headroom (80) covers preamble drift from the smaller models.
+        max_tokens: 80,
+        temperature: 0.1,
+      }
+      if (isThinkingModel) request.extra_body = { enable_thinking: false }
+      const reply = await engine.chat.completions.create(request)
+      const raw = reply.choices?.[0]?.message?.content ?? ''
+      self.postMessage({ type: 'classify_done', taskId, raw, latencyMs: Date.now() - t0 })
+    } catch (err) {
+      self.postMessage({ type: 'classify_error', taskId, message: err?.message ?? String(err) })
+    }
+    return
+  }
+
   if (type === 'summarize' || type === 'assess_fit') {
     if (!engine) {
       self.postMessage({ type: 'task_error', taskId, message: 'Engine not loaded' })
@@ -134,7 +213,13 @@ self.onmessage = async (event) => {
         // its hedging language ("may", "might") doesn't collapse into a
         // single deterministic phrase across trials.
         temperature: type === 'summarize' ? 0.1 : 0.2,
-        frequency_penalty: type === 'summarize' ? 0.3 : 0,
+        // Bumped from 0.3 → 0.6 because Gemma 2 2B was hitting degenerate
+        // loops on the simplify prompt — emitting strings of "##" header
+        // markers ("############# ## ## ## …") instead of the body content.
+        // Higher frequency penalty discourages the same n-gram from
+        // re-firing, breaking the loop. Assess-fit stays at 0 so its
+        // hedging language ("may", "might") doesn't get penalized.
+        frequency_penalty: type === 'summarize' ? 0.6 : 0,
         stream: true,
       }
       if (isThinkingModel) request.extra_body = { enable_thinking: false }

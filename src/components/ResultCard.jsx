@@ -36,6 +36,36 @@ function SectionLabel({ children, pane }) {
   )
 }
 
+// Two-stage on-device pipeline status. Renders only in pane (detail) view
+// because the row already has a fit dot indicator. Tells the user
+// explicitly which stage is in flight so the empty content area below
+// doesn't read as "broken".
+function PipelineCaption({ stage, progress }) {
+  if (stage === 'classifying') {
+    return (
+      <div className="mb-5 flex items-center gap-2 px-3 py-2 rounded-lg bg-iris-50 border border-iris-100">
+        <span className="iris-shimmer-text inline-block w-2 h-2 rounded-full" aria-hidden="true">&nbsp;</span>
+        <span className="font-mono text-[11px] text-iris-700">
+          evaluating fit
+          {progress && progress.total > 0 && ` · ${progress.done} of ${progress.total}`}
+          <span className="text-parchment-700"> · plain-language summary will follow</span>
+        </span>
+      </div>
+    )
+  }
+  if (stage === 'awaiting-summary') {
+    return (
+      <div className="mb-5 flex items-center gap-2 px-3 py-2 rounded-lg bg-parchment-100 border border-parchment-200">
+        <span className="iris-shimmer-text inline-block w-2 h-2 rounded-full" aria-hidden="true">&nbsp;</span>
+        <span className="font-mono text-[11px] text-parchment-700">
+          generating plain-language summary…
+        </span>
+      </div>
+    )
+  }
+  return null
+}
+
 function MetaLine({ trial, nearest, pane }) {
   const sep = (
     <span aria-hidden="true" className={pane ? 'text-parchment-300' : 'text-parchment-500'}>
@@ -80,6 +110,8 @@ export default function ResultCard({
   inputLanguage = 'en',
   simplificationSupported = true,
   pane = false,
+  pipelineStage = null, // 'classifying' | 'awaiting-summary' | null
+  classifyProgress = null, // { done, total }
 }) {
   const nearest = nearestLocation(trial.locations, coords)
   const wrapperClass = pane
@@ -87,11 +119,12 @@ export default function ResultCard({
     : 'bg-white border border-parchment-400 rounded-lg p-5 mb-3 max-w-3xl'
 
   const sumState = simplification?.summarize
-  const fitState = simplification?.fit
-
+  // fitState/showFit removed when the "Why this might or might not fit you"
+  // section was dropped — Gemma 2B's accuracy on the fit narrative wasn't
+  // reliable enough to ship. Re-introduce both if the fit section comes
+  // back behind a fine-tuned model.
   const showPlainLanguage = sumState && sumState.status !== 'error'
   const showFallbackHint = sumState?.status === 'error'
-  const showFit = fitState && fitState.status !== 'error' && fitState.text
 
   return (
     <article className={wrapperClass}>
@@ -112,6 +145,10 @@ export default function ResultCard({
       )}
 
       <MetaLine trial={trial} nearest={nearest} pane={pane} />
+
+      {pane && pipelineStage && (
+        <PipelineCaption stage={pipelineStage} progress={classifyProgress} />
+      )}
 
       {showPlainLanguage && (
         <div className={pane ? 'mb-4' : 'mb-3'}>
@@ -135,16 +172,11 @@ export default function ResultCard({
             </div>
           )}
 
-          {showFit && (
-            <div className={pane ? 'mb-4' : ''}>
-              <SectionLabel pane={pane}>Why this might or might not fit you</SectionLabel>
-              <p className={pane
-                ? 'text-[15px] text-parchment-900 leading-[1.6] whitespace-pre-wrap'
-                : 'text-sm text-parchment-900 leading-relaxed mb-3 whitespace-pre-wrap'}>
-                {fitState.text}
-              </p>
-            </div>
-          )}
+          {/* "Why this might or might not fit you" intentionally omitted —
+              Gemma 2B's accuracy on the fit narrative isn't reliable
+              enough to ship. The TriageRow fit dot (driven by the
+              classifier) is the safer signal. The DoctorDisclaimer
+              below renders unconditionally to set expectations. */}
 
           {(sumState.status === 'queued' || sumState.status === 'streaming') && (
             <p className="font-mono text-[11px] text-parchment-700 italic mb-2">
@@ -224,8 +256,26 @@ export default function ResultCard({
         </p>
       )}
 
+      {pane && (
+        <details className="mt-6 mb-2 px-4 py-3 rounded-lg bg-iris-50 border border-iris-100 group">
+          <summary className="cursor-pointer list-none text-[13px] text-parchment-900 leading-relaxed select-none">
+            <span className="font-semibold text-iris-700">Check with your doctor when exploring treatment options</span>
+            {' '}— this AI summary uses plain language to explain the treatment but can miss
+            eligibility details.
+            <span className="font-mono text-[11px] text-iris-700 ml-2 opacity-70 group-open:hidden">
+              why?
+            </span>
+          </summary>
+          <p className="mt-3 text-[13px] text-parchment-900 leading-relaxed">
+            The plain-language summary above was generated on your device by a small AI model. It
+            can miss or misstate who qualifies for a trial. Your care team has your full medical
+            picture and can confirm whether this one actually fits.
+          </p>
+        </details>
+      )}
+
       {pane ? (
-        <div className="mt-6 pt-5 border-t border-parchment-200 flex flex-col gap-1.5 text-[13px]">
+        <div className="mt-4 pt-5 border-t border-parchment-200 flex flex-col gap-1.5 text-[13px]">
           <div className="font-mono text-[11px] text-parchment-700 mb-1">contact</div>
           {trial.contact.phone && (
             <span className="text-parchment-900">{trial.contact.phone}</span>

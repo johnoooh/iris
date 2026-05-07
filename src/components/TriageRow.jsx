@@ -1,5 +1,41 @@
 import { nearestLocation } from '../utils/apiHelpers'
 
+function FitDot({ classification, pending }) {
+  if (classification?.verdict === 'PARSE_FAIL') return null
+
+  if (pending && !classification) {
+    return (
+      <span
+        className="iris-shimmer-text inline-block w-2 h-2 rounded-full mr-1"
+        title="Evaluating fit…"
+        aria-label="Evaluating fit"
+      >&nbsp;</span>
+    )
+  }
+  if (!classification) return null
+
+  const isLikely = classification.verdict === 'LIKELY'
+  // Fold the model's reason into aria-label so SR/keyboard users get the
+  // same context as a sighted hover. title alone wasn't reaching either
+  // group reliably (title isn't announced by most screen readers, isn't
+  // keyboard-discoverable). Same string in both attrs means verdict +
+  // reason are the unit a user perceives, not just the verdict.
+  const label = isLikely
+    ? `Likely fit — ${classification.reason || 'matches your description'}`
+    : `Less likely fit — ${classification.reason || 'may not match'}`
+  return (
+    <span
+      role="img"
+      className={[
+        'inline-block w-2 h-2 rounded-full mr-1 shrink-0',
+        isLikely ? 'bg-iris-500' : 'border border-parchment-400',
+      ].join(' ')}
+      title={label}
+      aria-label={label}
+    />
+  )
+}
+
 const PHASE_SHORT = {
   EARLY_PHASE1: 'Early Phase 1',
   PHASE1: 'Phase 1',
@@ -22,6 +58,8 @@ export default function TriageRow({
   comparing = false,
   onToggleCompare,
   compareDisabled = false,
+  classification = null,
+  classifyPending = false,
 }) {
   const nearest = nearestLocation(trial.locations, coords)
   const phase = formatPhase(trial.phases)
@@ -51,7 +89,8 @@ export default function TriageRow({
         >
           {trial.title}
         </h3>
-        <span className="font-mono text-[11px] text-parchment-700 flex flex-wrap gap-x-1.5">
+        <span className="font-mono text-[11px] text-parchment-700 flex flex-wrap items-center gap-x-1.5">
+          <FitDot classification={classification} pending={classifyPending} />
           {nearest?.distanceMi != null && <span>{nearest.distanceMi} mi</span>}
           {nearest?.distanceMi != null && phase && <span aria-hidden="true">·</span>}
           {phase && <span>{phase}</span>}

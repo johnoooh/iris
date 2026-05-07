@@ -158,3 +158,41 @@ describe('NaturalLanguageInput — error state', () => {
     expect(screen.getByText(/try again/i)).toBeInTheDocument()
   })
 })
+
+describe('NaturalLanguageInput — queued submit during download', () => {
+  // Locks in the typing-while-loading flow: a user can hit Find trials while
+  // the model is still downloading; the intent is held until status flips to
+  // 'ready' and then auto-fires. Indirect smoke test for the StrictMode
+  // listener fix in useNLP — if the listener didn't re-attach after the dev
+  // double-invoke, the real-world status would never reach 'ready' and the
+  // drain effect (deps [status, pendingSubmit]) would never fire.
+  it('queues submit while downloading, fires extract once status flips to ready', async () => {
+    const extract = vi.fn().mockResolvedValue({
+      condition: 'breast cancer', location: null, age: 58, sex: 'FEMALE',
+      status: 'RECRUITING', phases: [],
+    })
+    useNLP.mockReturnValue({ ...baseHook, status: 'downloading', extract })
+    localStorage.setItem('iris_nlp_enabled', 'true')
+
+    const onExtract = vi.fn()
+    const { rerender } = render(<NaturalLanguageInput onExtract={onExtract} />)
+    fireEvent.click(screen.getByRole('button', { name: /describe in your own words/i }))
+
+    fireEvent.change(screen.getByRole('textbox', { name: /natural language search/i }), {
+      target: { value: '58 with breast cancer' },
+    })
+
+    // Submit while downloading — should queue, NOT fire extract yet.
+    fireEvent.click(screen.getByRole('button', { name: /Run when ready/i }))
+    expect(extract).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: /Queued/i })).toBeInTheDocument()
+
+    // Worker reports ready. In production this comes via the listener that
+    // the StrictMode fix ensures stays attached after the cleanup-remount.
+    useNLP.mockReturnValue({ ...baseHook, status: 'ready', extract })
+    rerender(<NaturalLanguageInput onExtract={onExtract} />)
+
+    await waitFor(() => expect(extract).toHaveBeenCalledWith('58 with breast cancer'))
+    await waitFor(() => expect(onExtract).toHaveBeenCalled())
+  })
+})

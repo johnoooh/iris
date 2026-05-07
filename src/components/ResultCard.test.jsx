@@ -140,22 +140,19 @@ describe('ResultCard — Phase 3 simplification', () => {
     expect(screen.getByText(/Plain-language version unavailable/i)).toBeInTheDocument()
   })
 
-  it('renders the fit paragraph when fit state is complete', () => {
+  // The "Why this might or might not fit you" section was removed because
+  // Gemma 2B's accuracy on the fit narrative wasn't reliable enough to
+  // ship — it occasionally flipped disease stage or treatment history.
+  // The TriageRow fit dot (driven by the binary classifier in
+  // useClassifier) is the safer signal. The simplifier still computes
+  // assess_fit when called; ResultCard just no longer renders it.
+  it('does not render the fit paragraph even when fit state is complete', () => {
     const simplification = {
       summarize: { status: 'complete', summary: 'Sum.', eligibility: 'Elig.', error: null },
       fit: { status: 'complete', text: 'This may fit you because…', error: null },
     }
     render(<ResultCard trial={trial} coords={null} simplification={simplification} />)
-    expect(screen.getByText(/Why this might or might not fit you/i)).toBeInTheDocument()
-    expect(screen.getByText('This may fit you because…')).toBeInTheDocument()
-  })
-
-  it('does not render fit section when fit is in error', () => {
-    const simplification = {
-      summarize: { status: 'complete', summary: 'Sum.', eligibility: 'Elig.', error: null },
-      fit: { status: 'error', text: '', error: 'failed' },
-    }
-    render(<ResultCard trial={trial} coords={null} simplification={simplification} />)
     expect(screen.queryByText(/Why this might or might not fit you/i)).not.toBeInTheDocument()
+    expect(screen.queryByText('This may fit you because…')).not.toBeInTheDocument()
   })
 })
