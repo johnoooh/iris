@@ -8,13 +8,27 @@ const MODES = [
 ]
 
 export default function UnifiedSearchBar({ onExtract, onSearch, prefill }) {
-  // When NL extraction succeeds we auto-flip to the structured form so the
-  // user can verify / edit the prefilled fields before searching.
   const [mode, setMode] = useState('nl')
 
+  // After NL extraction: surface what was understood (the chips render
+  // inside NaturalLanguageInput) and immediately fire the search using the
+  // extracted fields. The user stays on the NL tab — no jarring switch to
+  // the structured form. They can flip to the structured form manually if
+  // they want to refine.
   function handleExtract(payload) {
     onExtract(payload)
-    setMode('form')
+    const f = payload?.fields ?? {}
+    if (!f.condition) return // can't search without a condition; chips show the gap
+    onSearch({
+      condition: f.condition,
+      location: f.location || null,
+      radius: f.location ? '50' : null,
+      age: f.age ?? null,
+      sex: f.sex ?? 'ALL',
+      status: f.status ?? 'RECRUITING',
+      phases: f.phases ?? [],
+      sort: 'relevance',
+    })
   }
 
   return (
