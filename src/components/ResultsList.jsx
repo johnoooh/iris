@@ -397,16 +397,14 @@ const PHASE_LABELS = {
   PHASE4: 'Phase 4',
 }
 
-const SORT_OPTIONS = [
-  { id: 'fit',      label: 'Best fit',     disabled: true, title: 'Available once on-device classification runs' },
-  { id: 'distance', label: 'Distance',     disabled: true, title: 'Sort wiring coming in a follow-up' },
-  { id: 'phase',    label: 'Phase',        disabled: true, title: 'Sort wiring coming in a follow-up' },
-  { id: 'recent',   label: 'Most recent',  disabled: true, title: 'Sort wiring coming in a follow-up' },
-]
+// Sort UI removed — the chips were visible-but-disabled placeholders for
+// "Best fit" / "Distance" / "Phase" / "Most recent" which read as broken
+// to users. When sort wiring lands (CT.gov API supports `sort=` for
+// distance and last-update; "Best fit" needs the classifier verdicts
+// per-trial), restore from git history at 67d5fc8 and wire onClick →
+// re-fetch through useClinicalTrials with the new sort token.
 
 function ResultsToolbar({ totalCount, searchParams, classifyProgress }) {
-  const [sort, setSort] = useState('recent')
-
   const summaryParts = [`${totalCount.toLocaleString()} trial${totalCount !== 1 ? 's' : ''}`]
   if (searchParams.location) summaryParts.push(`near ${searchParams.location}`)
   if (searchParams.location && searchParams.radius) summaryParts.push(`within ${searchParams.radius} mi`)
@@ -417,7 +415,7 @@ function ResultsToolbar({ totalCount, searchParams, classifyProgress }) {
   }
 
   return (
-    <div className="px-4 sm:px-6 py-3 border-b border-parchment-200 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+    <div className="px-4 sm:px-6 py-3 border-b border-parchment-200 flex flex-wrap items-center gap-x-6 gap-y-2">
       <p className="font-mono text-[11px] text-parchment-700 leading-snug">
         {summaryParts.map((part, i) => (
           <span key={i}>
@@ -434,34 +432,6 @@ function ResultsToolbar({ totalCount, searchParams, classifyProgress }) {
           </span>
         )}
       </p>
-      <div className="hidden sm:flex items-center gap-1" role="group" aria-label="Sort results">
-        <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-parchment-700 mr-2">
-          sort
-        </span>
-        {SORT_OPTIONS.map(opt => {
-          const active = sort === opt.id
-          return (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => !opt.disabled && setSort(opt.id)}
-              disabled={opt.disabled}
-              title={opt.title}
-              {...(opt.disabled ? {} : { 'aria-pressed': active })}
-              className={[
-                'text-[11px] px-2 py-0.5 rounded-md transition-colors',
-                opt.disabled
-                  ? 'text-parchment-500 cursor-not-allowed'
-                  : active
-                    ? 'bg-iris-50 text-iris-700 font-medium'
-                    : 'text-parchment-700 hover:text-parchment-950 hover:bg-parchment-100',
-              ].join(' ')}
-            >
-              {opt.label}
-            </button>
-          )
-        })}
-      </div>
     </div>
   )
 }
