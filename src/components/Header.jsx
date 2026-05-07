@@ -1,6 +1,6 @@
 export default function Header() {
   return (
-    <header className="border-b border-parchment-200 px-4 sm:px-7 py-4 sm:py-5 flex items-center justify-between gap-3 flex-wrap">
+    <header className="no-print border-b border-parchment-200 px-4 sm:px-7 py-4 sm:py-5 flex items-center justify-between gap-3 flex-wrap">
       <div className="flex items-baseline gap-2 sm:gap-3.5">
         <span className="font-serif font-semibold text-[22px] sm:text-[26px] tracking-tight text-parchment-950 lowercase">
           iris

@@ -1,0 +1,85 @@
+/* Print stylesheet — only kicks in for window.print() / save-as-PDF.
+ *
+ * Strategy: hide chrome via .no-print, force-open <details>, let the
+ * remaining DOM print as a normal block flow. body[data-print-scope]
+ * differentiates the two print modes:
+ *   - "single-NCT…" set by the "Print this trial" button → only the
+ *     detail pane prints (list pane is hidden as chrome).
+ *   - "compare" set by "Print all" in CompareView → the compare table
+ *     prints with one trial per page.
+ *
+ * Why no jsPDF / react-pdf: native print produces searchable text in
+ * the resulting PDF, respects screen-reader semantics, and is zero-dep.
+ * The browser's print engine constrains layout but for a clinical-trial
+ * summary that's fine. */
+
+.print-only { display: none; }
+
+@media print {
+  html, body {
+    background: white !important;
+    color: #1c1812 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Anything tagged no-print disappears: header, search bar, footer,
+     list pane, sticky compare bar, all buttons, etc. */
+  .no-print { display: none !important; }
+
+  .print-only { display: block !important; }
+
+  /* Force-open every <details> so the disclaimer expansion + clinical
+     summary + footer disclosures render without the user having to
+     click them first. */
+  details > *:not(summary) { display: revert !important; }
+
+  /* Drop the app's screen-only flex-column / overflow-hidden so content
+     paginates instead of clipping. */
+  body, #root, #root > div, main, section[aria-label="Search results"] {
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+
+  /* Print scope: single trial only — the list pane needs to be gone too
+     even though it isn't tagged no-print (it's not chrome in normal use). */
+  body[data-print-scope^="single-"] .iris-list-pane { display: none !important; }
+  body[data-print-scope^="single-"] .iris-results-grid {
+    display: block !important;
+    grid-template-columns: none !important;
+  }
+  body[data-print-scope^="single-"] .iris-detail-pane {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  /* Compare-print: one trial per page. */
+  body[data-print-scope="compare"] .iris-print-trial + .iris-print-trial {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  /* Spell out external links so a printed page is actionable on paper. */
+  a[href^="http"]::after {
+    content: ' (' attr(href) ')';
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9pt;
+    color: #6b5d49;
+    word-break: break-all;
+  }
+
+  /* Page footer (Chrome/Safari/Edge support these margin boxes; Firefox
+     doesn't, so the in-body .print-only meta block is the fallback). */
+  @page {
+    margin: 0.65in;
+    @bottom-right {
+      content: counter(page) ' / ' counter(pages);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9pt;
+      color: #6b5d49;
+    }
+  }
+}

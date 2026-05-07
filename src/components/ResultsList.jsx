@@ -353,12 +353,12 @@ export default function ResultsList({
       />
 
       <div
-        className="flex-1 grid min-h-0 overflow-hidden"
+        className="iris-results-grid flex-1 grid min-h-0 overflow-hidden"
         style={{
           gridTemplateColumns: isMobile ? '1fr' : `${LIST_WIDTH_PX}px 1fr`,
         }}
       >
-        <div className="overflow-auto bg-parchment-100 border-r border-parchment-200 flex flex-col">
+        <div className="iris-list-pane no-print overflow-auto bg-parchment-100 border-r border-parchment-200 flex flex-col">
           <ul className="flex flex-col">
             {allTrials.map(trial => (
               <li key={trial.nctId} className="border-b border-parchment-200">
@@ -388,7 +388,7 @@ export default function ResultsList({
         </div>
 
         {!isMobile && (
-          <div className="overflow-auto bg-white" aria-live="polite">
+          <div className="iris-detail-pane overflow-auto bg-white" aria-live="polite">
             {selected && renderDetail(selected)}
           </div>
         )}
@@ -450,7 +450,7 @@ function ResultsToolbar({ totalCount, searchParams, classifyProgress }) {
   }
 
   return (
-    <div className="px-4 sm:px-6 py-3 border-b border-parchment-200 flex flex-wrap items-center gap-x-6 gap-y-2">
+    <div className="no-print px-4 sm:px-6 py-3 border-b border-parchment-200 flex flex-wrap items-center gap-x-6 gap-y-2">
       <p className="font-mono text-[11px] text-parchment-700 leading-snug">
         {summaryParts.map((part, i) => (
           <span key={i}>
@@ -474,7 +474,7 @@ function ResultsToolbar({ totalCount, searchParams, classifyProgress }) {
 function CompareBar({ count, staleCount = 0, onClear, onCompare }) {
   return (
     <div
-      className="border-t border-parchment-200 bg-white px-4 py-2.5 flex items-center justify-between gap-3 shrink-0"
+      className="no-print border-t border-parchment-200 bg-white px-4 py-2.5 flex items-center justify-between gap-3 shrink-0"
       style={{ boxShadow: '0 -4px 16px rgba(28, 24, 18, 0.06)' }}
       role="region"
       aria-label="Compare selection"

@@ -32,7 +32,7 @@ export default function UnifiedSearchBar({ onExtract, onSearch, prefill }) {
   }
 
   return (
-    <div className="bg-parchment-50 border-b border-parchment-200">
+    <div className="no-print bg-parchment-50 border-b border-parchment-200">
       <div
         className="px-4 sm:px-7 pt-4 pb-1 flex flex-wrap gap-1"
         role="tablist"

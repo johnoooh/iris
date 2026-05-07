@@ -9,6 +9,50 @@ const STATUS_STYLES = {
   TERMINATED: 'bg-red-100 text-red-700',
 }
 
+// Sets a transient body[data-print-scope="single-NCT…"] before calling
+// window.print(), clears on the matching afterprint event. The print
+// stylesheet keys off this attribute to hide the list pane and let the
+// detail pane flow as a single block.
+function PrintTrialButton({ trial }) {
+  function handleClick() {
+    const scope = `single-${trial.nctId || 'unknown'}`
+    document.body.setAttribute('data-print-scope', scope)
+    const cleanup = () => {
+      document.body.removeAttribute('data-print-scope')
+      window.removeEventListener('afterprint', cleanup)
+    }
+    window.addEventListener('afterprint', cleanup)
+    window.print()
+  }
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      className="no-print font-mono text-[11px] text-iris-700 hover:text-iris-900 px-2 py-1"
+      title="Print this trial — save as PDF to share with your doctor"
+    >
+      print
+    </button>
+  )
+}
+
+// In-body print metadata: visible only when printing. Includes the NCT ID
+// prominently and a generated-on timestamp so the doctor receiving the
+// printout knows when it was captured. The CT.gov URL is appended via the
+// print stylesheet's `a[href^="http"]::after` rule so doctors can re-verify.
+function PrintMeta({ trial }) {
+  const dateStr = new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'long',
+    timeStyle: 'short',
+  }).format(new Date())
+  return (
+    <div className="print-only" style={{ marginBottom: '0.75em', fontFamily: 'JetBrains Mono, monospace', fontSize: '10pt', color: '#6b5d49' }}>
+      <div>NCT ID: <strong style={{ color: '#1c1812' }}>{trial.nctId}</strong></div>
+      <div>Generated: {dateStr} via IRIS — clinicaltrials.gov</div>
+    </div>
+  )
+}
+
 function StatusPill({ status }) {
   return (
     <span
@@ -132,10 +176,12 @@ export default function ResultCard({
         <>
           <div className="flex items-center justify-between gap-4 mb-3">
             <StatusPill status={trial.status} />
+            <PrintTrialButton trial={trial} />
           </div>
           <h2 className="font-serif font-semibold text-[24px] leading-[1.2] tracking-tight text-parchment-950 mb-2">
             {trial.title}
           </h2>
+          <PrintMeta trial={trial} />
         </>
       ) : (
         <div className="flex items-start justify-between gap-4 mb-2">

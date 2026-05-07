@@ -1,6 +1,6 @@
 export default function Footer() {
   return (
-    <footer className="border-t border-parchment-200 px-6 py-5 mt-8 bg-parchment-50">
+    <footer className="no-print border-t border-parchment-200 px-6 py-5 mt-8 bg-parchment-50">
       <div className="max-w-3xl space-y-3">
         <p className="text-xs text-parchment-800 leading-relaxed">
           IRIS is not medical advice. Always discuss clinical trial options with your healthcare
