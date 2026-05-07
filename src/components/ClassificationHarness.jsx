@@ -423,6 +423,26 @@ export default function ClassificationHarness() {
     setResults([])
   }
 
+  const [copyState, setCopyState] = useState('idle') // idle | copied | error
+  async function copyMarkdown() {
+    const md = buildMarkdownReport({
+      userDesc,
+      promptTemplate,
+      eligMax,
+      modelLabel: model.label,
+      results,
+      stats: { done: done.length, total: results.length, elapsed, avgLat, maxLat, parseRate, parseFails, agreementPct, matches, withExpected: withExpected.length },
+    })
+    try {
+      await navigator.clipboard.writeText(md)
+      setCopyState('copied')
+      setTimeout(() => setCopyState('idle'), 1800)
+    } catch {
+      setCopyState('error')
+      setTimeout(() => setCopyState('idle'), 2400)
+    }
+  }
+
   // ───────── stats ─────────
   const done = results.filter(r => r.status === 'DONE')
   const lats = done.map(r => r.latencyMs).filter(n => n != null)
@@ -560,13 +580,23 @@ export default function ClassificationHarness() {
         </div>
 
         {(running || done.length > 0) && (
-          <div className="flex flex-wrap gap-4 font-mono text-[11px] text-parchment-700 mt-3">
+          <div className="flex flex-wrap items-center gap-4 font-mono text-[11px] text-parchment-700 mt-3">
             <span><strong className="text-parchment-950">{done.length} / {results.length}</strong> done</span>
             <span>elapsed <strong className="text-parchment-950">{elapsed}s</strong></span>
             <span>avg latency <strong className="text-parchment-950">{avgLat}ms</strong></span>
             <span>max latency <strong className="text-parchment-950">{maxLat}ms</strong></span>
             <span>parse rate <strong className="text-parchment-950">{parseRate}%</strong></span>
             <span>parse fails <strong className="text-parchment-950">{parseFails}</strong></span>
+            {done.length > 0 && !running && (
+              <button
+                type="button"
+                onClick={copyMarkdown}
+                className="ml-auto inline-flex items-center gap-1.5 border border-iris-300 text-iris-700 hover:bg-iris-50 px-2.5 py-1 rounded text-[11px] transition-colors"
+                title="Copy a shareable markdown summary of this run to your clipboard"
+              >
+                {copyState === 'copied' ? '✓ copied' : copyState === 'error' ? 'copy failed' : 'copy results as markdown'}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -600,6 +630,57 @@ export default function ClassificationHarness() {
       </details>
     </div>
   )
+}
+
+function buildMarkdownReport({ userDesc, promptTemplate, eligMax, modelLabel, results, stats }) {
+  const escape = (s) => String(s ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ').trim()
+  const truncate = (s, n) => {
+    const t = escape(s)
+    return t.length > n ? t.slice(0, n - 1) + '…' : t
+  }
+
+  const lines = []
+  lines.push('# Classification harness run')
+  lines.push('')
+  lines.push(`**Model:** ${modelLabel}`)
+  lines.push(`**User description:** ${userDesc}`)
+  lines.push(`**Eligibility max chars:** ${eligMax}`)
+  lines.push('')
+  lines.push('## Stats')
+  lines.push('')
+  lines.push(`| Metric | Value |`)
+  lines.push(`|---|---|`)
+  lines.push(`| Done | ${stats.done} / ${stats.total} |`)
+  lines.push(`| Elapsed | ${stats.elapsed}s |`)
+  lines.push(`| Avg latency | ${stats.avgLat}ms |`)
+  lines.push(`| Max latency | ${stats.maxLat}ms |`)
+  lines.push(`| Parse rate | ${stats.parseRate}% (${stats.parseFails} fails) |`)
+  if (stats.agreementPct != null) {
+    lines.push(`| Agreement | ${stats.matches} / ${stats.withExpected} (${stats.agreementPct}%) |`)
+  }
+  lines.push('')
+  lines.push('## Results')
+  lines.push('')
+  lines.push(`| Trial | NCT | Verdict | Expected | Match | Latency | Reason / Raw |`)
+  lines.push(`|---|---|---|---|---|---|---|`)
+  for (const r of results) {
+    if (r.status !== 'DONE') continue
+    const v = r.verdict || 'PARSE_FAIL'
+    const exp = r.trial.expected || '—'
+    const match = r.trial.expected ? (r.verdict === r.trial.expected ? '✓' : '✗') : ''
+    const latency = r.latencyMs != null ? `${Math.round(r.latencyMs)}ms` : '—'
+    const reasonOrRaw = r.reason && r.reason !== '(no reason)' ? r.reason : `raw: ${r.raw || '—'}`
+    lines.push(`| ${truncate(r.trial.title || r.trial.briefTitle || r.trial.nctId, 80)} | ${escape(r.trial.nctId || '')} | ${v} | ${exp} | ${match} | ${latency} | ${truncate(reasonOrRaw, 140)} |`)
+  }
+  lines.push('')
+  lines.push('<details>')
+  lines.push('<summary>Prompt template used</summary>')
+  lines.push('')
+  lines.push('```')
+  lines.push(promptTemplate)
+  lines.push('```')
+  lines.push('</details>')
+  return lines.join('\n')
 }
 
 function ResultsTable({ rows }) {
