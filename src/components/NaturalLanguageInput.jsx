@@ -4,8 +4,8 @@ import { NLP_MODELS, resolveModelKey } from '../utils/nlpModels'
 
 const STORAGE_KEY = 'iris_nlp_enabled'
 
-export default function NaturalLanguageInput({ onExtract }) {
-  const [expanded, setExpanded] = useState(false)
+export default function NaturalLanguageInput({ onExtract, embedded = false }) {
+  const [expanded, setExpanded] = useState(embedded)
   const [text, setText] = useState('')
   const [extracted, setExtracted] = useState(null)
   const [consented, setConsented] = useState(() => {
@@ -82,28 +82,34 @@ export default function NaturalLanguageInput({ onExtract }) {
     ? 'bg-parchment-200 text-parchment-700'
     : 'bg-iris-100 text-iris-700'
 
+  const outerClass = embedded
+    ? 'px-4 sm:px-7 pt-2 pb-4'
+    : 'bg-parchment-50 border-b border-parchment-200 px-6 py-3'
+
   return (
-    <div className="bg-parchment-50 border-b border-parchment-200 px-6 py-3">
-      <button
-        type="button"
-        className={[
-          'inline-flex items-center gap-2 text-[12px] font-medium rounded-full px-3 py-1.5 transition-colors',
-          expanded
-            ? 'bg-parchment-100 text-parchment-950 border border-parchment-300'
-            : 'text-parchment-700 hover:text-parchment-950 hover:bg-parchment-100 border border-transparent',
-        ].join(' ')}
-        onClick={() => setExpanded(e => !e)}
-        aria-expanded={expanded}
-        aria-controls="nlp-panel"
-      >
-        <span>Describe in your own words</span>
-        <span className={`font-mono text-[10px] px-1.5 py-px rounded-full ${badgeClass}`}>
-          {badgeLabel ?? 'AI · on-device'}
-        </span>
-      </button>
+    <div className={outerClass}>
+      {!embedded && (
+        <button
+          type="button"
+          className={[
+            'inline-flex items-center gap-2 text-[12px] font-medium rounded-full px-3 py-1.5 transition-colors',
+            expanded
+              ? 'bg-parchment-100 text-parchment-950 border border-parchment-300'
+              : 'text-parchment-700 hover:text-parchment-950 hover:bg-parchment-100 border border-transparent',
+          ].join(' ')}
+          onClick={() => setExpanded(e => !e)}
+          aria-expanded={expanded}
+          aria-controls="nlp-panel"
+        >
+          <span>Describe in your own words</span>
+          <span className={`font-mono text-[10px] px-1.5 py-px rounded-full ${badgeClass}`}>
+            {badgeLabel ?? 'AI · on-device'}
+          </span>
+        </button>
+      )}
 
       {expanded && (
-        <div id="nlp-panel" className="mt-3 max-w-xl">
+        <div id="nlp-panel" className={embedded ? 'max-w-2xl' : 'mt-3 max-w-xl'}>
           {/* WebGPU unavailable */}
           {!webGPUSupported && (
             <div className="bg-parchment-50 border border-parchment-300 rounded-md p-3">

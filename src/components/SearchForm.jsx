@@ -9,7 +9,7 @@ const PHASES = [
 
 const RADII = ['25', '50', '100', '200']
 
-export default function SearchForm({ onSearch, prefill }) {
+export default function SearchForm({ onSearch, prefill, embedded = false }) {
   const [condition, setCondition] = useState('')
   const [location, setLocation] = useState('')
   const [radius, setRadius] = useState('50')
@@ -65,10 +65,19 @@ export default function SearchForm({ onSearch, prefill }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-parchment-50 border-b border-parchment-200 px-4 sm:px-6 py-4 sm:py-5">
-      <h2 className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-parchment-700 mb-4">
-        find clinical trials
-      </h2>
+    <form
+      onSubmit={handleSubmit}
+      className={
+        embedded
+          ? 'px-4 sm:px-7 pt-2 pb-4'
+          : 'bg-parchment-50 border-b border-parchment-200 px-4 sm:px-6 py-4 sm:py-5'
+      }
+    >
+      {!embedded && (
+        <h2 className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-parchment-700 mb-4">
+          find clinical trials
+        </h2>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
         <div className="lg:col-span-2">
