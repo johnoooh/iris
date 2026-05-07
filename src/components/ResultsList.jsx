@@ -271,15 +271,33 @@ export default function ResultsList({ searchParams, modelKey, userDescription, e
   }
 
   function renderDetail(trial) {
+    // Tell ResultCard which pipeline stage is in flight so it can render
+    // an explicit progress caption above the empty content area instead of
+    // showing the trial's raw summary (which can look like the model
+    // already replied with the wrong text).
+    let pipelineStage = null
+    const sim = simplifier.states.get(trial.nctId)
+    const simStatus = sim?.summarize?.status
+    if (canClassify && !classifyDone) {
+      pipelineStage = 'classifying'
+    } else if (
+      simplificationSupported &&
+      (!simStatus || simStatus === 'queued') &&
+      classifyDone
+    ) {
+      pipelineStage = 'awaiting-summary'
+    }
     return (
       <ResultCard
         trial={trial}
         coords={coords ?? null}
-        simplification={simplifier.states.get(trial.nctId)}
+        simplification={sim}
         onRequestSimplify={simplificationSupported ? handleRequestSimplify : null}
         inputLanguage={inputLanguage}
         simplificationSupported={simplificationSupported}
         pane
+        pipelineStage={pipelineStage}
+        classifyProgress={canClassify ? classifyProgress : null}
       />
     )
   }

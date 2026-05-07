@@ -36,6 +36,36 @@ function SectionLabel({ children, pane }) {
   )
 }
 
+// Two-stage on-device pipeline status. Renders only in pane (detail) view
+// because the row already has a fit dot indicator. Tells the user
+// explicitly which stage is in flight so the empty content area below
+// doesn't read as "broken".
+function PipelineCaption({ stage, progress }) {
+  if (stage === 'classifying') {
+    return (
+      <div className="mb-5 flex items-center gap-2 px-3 py-2 rounded-lg bg-iris-50 border border-iris-100">
+        <span className="iris-shimmer-text inline-block w-2 h-2 rounded-full" aria-hidden="true">&nbsp;</span>
+        <span className="font-mono text-[11px] text-iris-700">
+          evaluating fit
+          {progress && progress.total > 0 && ` · ${progress.done} of ${progress.total}`}
+          <span className="text-parchment-700"> · plain-language summary will follow</span>
+        </span>
+      </div>
+    )
+  }
+  if (stage === 'awaiting-summary') {
+    return (
+      <div className="mb-5 flex items-center gap-2 px-3 py-2 rounded-lg bg-parchment-100 border border-parchment-200">
+        <span className="iris-shimmer-text inline-block w-2 h-2 rounded-full" aria-hidden="true">&nbsp;</span>
+        <span className="font-mono text-[11px] text-parchment-700">
+          generating plain-language summary…
+        </span>
+      </div>
+    )
+  }
+  return null
+}
+
 function MetaLine({ trial, nearest, pane }) {
   const sep = (
     <span aria-hidden="true" className={pane ? 'text-parchment-300' : 'text-parchment-500'}>
@@ -80,6 +110,8 @@ export default function ResultCard({
   inputLanguage = 'en',
   simplificationSupported = true,
   pane = false,
+  pipelineStage = null, // 'classifying' | 'awaiting-summary' | null
+  classifyProgress = null, // { done, total }
 }) {
   const nearest = nearestLocation(trial.locations, coords)
   const wrapperClass = pane
@@ -112,6 +144,10 @@ export default function ResultCard({
       )}
 
       <MetaLine trial={trial} nearest={nearest} pane={pane} />
+
+      {pane && pipelineStage && (
+        <PipelineCaption stage={pipelineStage} progress={classifyProgress} />
+      )}
 
       {showPlainLanguage && (
         <div className={pane ? 'mb-4' : 'mb-3'}>
