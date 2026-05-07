@@ -279,20 +279,13 @@ export default function ClassificationHarness() {
           >
             Reset trials
           </button>
-          <label className="inline-flex items-center gap-2 text-[12px] text-parchment-700">
-            Concurrency
-            <select
-              value={concurrency}
-              onChange={e => setConcurrency(parseInt(e.target.value, 10))}
-              disabled={running}
-              className="px-2 py-1 text-[12px] border border-parchment-300 rounded bg-white"
-            >
-              <option value={1}>1 (serial)</option>
-              <option value={2}>2</option>
-              <option value={3}>3</option>
-              <option value={5}>5</option>
-            </select>
-          </label>
+          <span
+            className="inline-flex items-center gap-2 text-[11px] text-parchment-700"
+            title="WebLLM's MLCEngine is single-threaded — parallel inference clobbers state. Requests serialize through a hook-level promise chain regardless of caller concurrency."
+          >
+            <span className="font-mono text-[10px] uppercase tracking-[0.04em]">execution</span>
+            serial (engine constraint)
+          </span>
           <label className="inline-flex items-center gap-2 text-[12px] text-parchment-700">
             Eligibility max chars
             <input
