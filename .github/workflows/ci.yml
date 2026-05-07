@@ -44,3 +44,15 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # Upload the built dist/ as a workflow artifact so reviewers can
+      # download and serve it locally (e.g. `npx serve dist`) to verify the
+      # production bundle of the PR's exact code. Retention is short to
+      # avoid clutter; the artifact is for review-time only, not archival.
+      - name: Upload built site
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ github.event.pull_request.number || github.sha }}
+          path: dist/
+          retention-days: 7
+          if-no-files-found: error
