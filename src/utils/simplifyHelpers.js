@@ -97,13 +97,6 @@ export function buildSummarizePrompt(trial, options = {}) {
   const ex = SUMMARIZE_EXEMPLAR
   const langPre = languagePreGenInstruction(options.outputLanguage)
   const langPost = languagePostGenReminder(options.outputLanguage)
-  // The trailing instruction is intentionally directive ("Write the
-  // plain-language summary now…") rather than a bare label like
-  // "PLAIN-LANGUAGE OUTPUT:". Some chat-tuned models (Qwen2.5-1.5B) read
-  // a trailing label as a topic header and hallucinate unrelated tutorial
-  // content from training data instead of continuing the task. Naming
-  // the action — and pinning the first header the model must emit — fixes
-  // it for Qwen and stays compatible with Gemma's behavior on this prompt.
   return `${SUMMARIZE_INSTRUCTIONS}
 
 Here is an example.
@@ -112,17 +105,17 @@ SOURCE TRIAL:
 Brief summary: ${ex.input.briefSummary}
 Eligibility: ${ex.input.eligibility}
 
-EXAMPLE PLAIN-LANGUAGE OUTPUT:
+PLAIN-LANGUAGE OUTPUT:
 ${ex.output}
 ${langPre}
 
-Now write the plain-language summary for the SOURCE TRIAL below, using the same two-section structure (## What this study is testing, then ## Who can join). Use only facts from this trial.
+Now do the same for this trial.
 
 SOURCE TRIAL:
 Brief summary: ${trial.summary ?? ''}
 Eligibility: ${trial.eligibility?.criteria ?? ''}
 ${langPost}
-Begin your response with "## What this study is testing":
+PLAIN-LANGUAGE OUTPUT:
 `
 }
 
@@ -142,9 +135,6 @@ Keep drug names (e.g. trastuzumab deruxtecan, pembrolizumab) and gene names (e.g
 Do NOT write the assessment in English.`
     : ''
   const langPost = isNonEnglish ? `\nReminder: write your assessment in ${options.outputLanguage}.` : ''
-  // Same trailing-marker fix as buildSummarizePrompt — replace the bare
-  // "ASSESSMENT:" label with a directive instruction so chat-tuned models
-  // don't read it as a topic header and hallucinate.
   return `${ASSESS_FIT_INSTRUCTIONS}
 
 Here is an example.
@@ -157,11 +147,11 @@ TRIAL:
 Brief summary: ${ex.input.briefSummary}
 Eligibility: ${ex.input.eligibility}
 
-EXAMPLE ASSESSMENT:
+ASSESSMENT:
 ${ex.output}
 ${langPre}
 
-Now write the assessment for the patient and trial below.
+Now do the same.
 
 PATIENT:
 ${descLine}
@@ -171,6 +161,6 @@ TRIAL:
 Brief summary: ${trial.summary ?? ''}
 Eligibility: ${trial.eligibility?.criteria ?? ''}
 ${langPost}
-Write your 2-4 sentence assessment now:
+ASSESSMENT:
 `
 }

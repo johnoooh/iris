@@ -170,10 +170,7 @@ describe('buildSummarizePrompt', () => {
   it('also includes a final pre-generation reminder so the directive is the most recent token', () => {
     const prompt = buildSummarizePrompt(trial, { outputLanguage: 'Spanish' })
     const reminderIdx = prompt.lastIndexOf('Reminder: write the body in Spanish')
-    // The trailing cue used to be the bare label "PLAIN-LANGUAGE OUTPUT:" but
-    // chat-tuned models read that as a header and hallucinate. The new cue is
-    // a directive ending with the first header the model must emit.
-    const finalCueIdx = prompt.lastIndexOf('Begin your response with "## What this study is testing"')
+    const finalCueIdx = prompt.lastIndexOf('PLAIN-LANGUAGE OUTPUT:')
     expect(reminderIdx).toBeGreaterThan(-1)
     expect(reminderIdx).toBeLessThan(finalCueIdx)
   })
