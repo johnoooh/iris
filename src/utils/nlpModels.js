@@ -9,18 +9,14 @@ export const NLP_MODELS = {
     sizeLabel: '~1.3 GB',
     isThinking: false,
   },
-  gemma_fast: {
-    // q4f16_1 vs q4f32_1: same model, smaller weights and fp16 activations.
-    // WebGPU's native compute type is fp16 on most GPUs, so inference is
-    // measurably faster (often 30-40% fewer ms/token) with no measurable
-    // quality loss on short instruction tasks. Try via ?model=gemma_fast;
-    // if it holds up in real classification + simplification, promote it
-    // to the registry default in a follow-up.
-    id: 'gemma-2-2b-it-q4f16_1-MLC',
-    label: 'Gemma 2 2B (fast)',
-    sizeLabel: '~900 MB',
-    isThinking: false,
-  },
+  // Gemma 2 2B q4f16_1 was tried as a faster alternative (~30% lower
+  // latency from native-fp16 WebGPU compute) but the lower activation
+  // precision degraded the simplifier's structured output — section
+  // headers ("## What this study is testing" / "## Who can join") came
+  // out malformed, and Gemma can only have ONE quant loaded at a time
+  // so we can't mix q4f16_1 for classification and q4f32_1 for
+  // simplification. q4f32_1 stays as the sole Gemma 2 2B variant.
+
   qwen3: {
     id: 'Qwen3-1.7B-q4f32_1-MLC',
     label: 'Qwen3 1.7B',
