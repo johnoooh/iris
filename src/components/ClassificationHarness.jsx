@@ -40,6 +40,98 @@ const SAMPLE_TRIALS = [
     eligibility: 'Inclusion: Pediatric patients aged 2-17 years. Newly diagnosed ALL. Exclusion: Adults. Prior chemotherapy.',
     expected: 'UNLIKELY',
   },
+
+  // ─── Subtype-gated breast cancer trials — POSSIBLE without confirmed subtype ───
+  {
+    nctId: 'NCT05300100',
+    title: 'Tucatinib + Trastuzumab in HER2-Positive Metastatic Breast Cancer',
+    eligibility: 'Inclusion: Adult, any sex, ≥18 years. Histologically confirmed HER2-positive metastatic breast cancer (IHC 3+ or FISH-amplified). At least 2 prior HER2-directed therapies. ECOG 0-1. Exclusion: Untreated brain metastases. Prior tucatinib.',
+    expected: 'POSSIBLE',
+  },
+  {
+    nctId: 'NCT05400201',
+    title: 'Olaparib Maintenance in BRCA-Mutated HER2-Negative Breast Cancer',
+    eligibility: 'Inclusion: Adult female. HER2-negative breast cancer with germline BRCA1 or BRCA2 mutation (confirmed by central testing). High-risk early disease following adjuvant chemotherapy. Postmenopausal or premenopausal with ovarian suppression. Exclusion: Prior PARP inhibitor.',
+    expected: 'POSSIBLE',
+  },
+  {
+    nctId: 'NCT05511223',
+    title: 'CDK4/6 Inhibitor Switch in Hormone-Receptor-Positive Advanced Breast Cancer',
+    eligibility: 'Inclusion: Adult women, postmenopausal. HR-positive, HER2-negative advanced or metastatic breast cancer. Disease progression on a prior CDK4/6 inhibitor. ECOG 0-2.',
+    expected: 'POSSIBLE',
+  },
+
+  // ─── Strong matches for a 58yo with breast cancer ───
+  {
+    nctId: 'NCT05633445',
+    title: 'Cognitive Behavioral Therapy for Cancer-Related Fatigue',
+    eligibility: 'Inclusion: Adults ≥18 years with any solid tumor diagnosis (breast, colon, lung, prostate, etc.). Currently in active treatment or within 5 years of treatment completion. Self-reported fatigue ≥4 on a 0-10 scale. Exclusion: Severe untreated depression. Inability to attend weekly sessions.',
+    expected: 'LIKELY',
+  },
+  {
+    nctId: 'NCT05755677',
+    title: 'Lymphedema Surveillance Program After Breast Cancer Surgery',
+    eligibility: 'Inclusion: Adult female ≥18 years. History of breast cancer treated with axillary surgery (sentinel lymph node biopsy or axillary dissection). Within 3 years of surgery. Exclusion: Pre-existing lymphedema. Current breast cancer recurrence.',
+    expected: 'LIKELY',
+  },
+  {
+    nctId: 'NCT05822334',
+    title: 'Mindfulness-Based Stress Reduction for Breast Cancer Survivors',
+    eligibility: 'Inclusion: Adult women ≥21 years. Diagnosed with breast cancer (any stage). Completed primary treatment within the past 5 years OR currently on adjuvant endocrine therapy. Exclusion: Active psychosis. Prior MBSR participation.',
+    expected: 'LIKELY',
+  },
+  {
+    nctId: 'NCT05901128',
+    title: 'Vaginal Estrogen Safety Study in Postmenopausal Breast Cancer Survivors',
+    eligibility: 'Inclusion: Postmenopausal women ages 45-75 with a history of HR-positive or HR-negative breast cancer. Disease-free for ≥1 year. Genitourinary symptoms of menopause. Stable on aromatase inhibitor or tamoxifen, or treatment-free. Exclusion: Current metastatic disease.',
+    expected: 'LIKELY',
+  },
+
+  // ─── Wrong condition / wrong demographic — clear UNLIKELY ───
+  {
+    nctId: 'NCT04567890',
+    title: 'Pembrolizumab in Advanced Melanoma',
+    eligibility: 'Inclusion: Adults with histologically confirmed unresectable Stage III or Stage IV melanoma. ECOG 0-1. No prior systemic therapy for advanced disease. Exclusion: Active autoimmune disease.',
+    expected: 'UNLIKELY',
+  },
+  {
+    nctId: 'NCT04678901',
+    title: 'Apixaban vs. Warfarin in Atrial Fibrillation',
+    eligibility: 'Inclusion: Adults ≥18 years with non-valvular atrial fibrillation. CHA2DS2-VASc score ≥2. Exclusion: Mechanical heart valve. Active bleeding.',
+    expected: 'UNLIKELY',
+  },
+  {
+    nctId: 'NCT04789012',
+    title: 'GLP-1 Agonist for Weight Management in Type 2 Diabetes',
+    eligibility: 'Inclusion: Adults 18-75 with Type 2 diabetes mellitus. BMI ≥30. HbA1c 7.0-10.0%. Exclusion: Type 1 diabetes. Active malignancy within 5 years. History of pancreatitis.',
+    expected: 'UNLIKELY',
+  },
+  {
+    nctId: 'NCT04890123',
+    title: 'Robotic Prostatectomy Outcomes in Localized Prostate Cancer',
+    eligibility: 'Inclusion: Men ≥40 years with biopsy-confirmed clinically localized prostate cancer (T1-T2). Candidate for radical prostatectomy. Exclusion: Prior pelvic surgery or radiation.',
+    expected: 'UNLIKELY',
+  },
+  {
+    nctId: 'NCT04901234',
+    title: 'Pediatric Vaccine Immunogenicity Study',
+    eligibility: 'Inclusion: Healthy children aged 6 months to 5 years. Up to date on routine immunizations. Exclusion: Immunocompromised. Recent illness within 14 days.',
+    expected: 'UNLIKELY',
+  },
+
+  // ─── Edge cases — should challenge the model ───
+  {
+    nctId: 'NCT05012345',
+    title: 'Palliative Care Integration in Patients with Advanced Solid Tumors',
+    eligibility: 'Inclusion: Adults ≥18 years with advanced (Stage IV) solid tumor of any primary site (breast, lung, GI, GU, GYN). Estimated prognosis 6-24 months. ECOG 0-3. Exclusion: Currently enrolled in hospice.',
+    expected: 'POSSIBLE',
+  },
+  {
+    nctId: 'NCT05123450',
+    title: 'Premenopausal Breast Cancer: Ovarian Function Suppression Trial',
+    eligibility: 'Inclusion: Premenopausal women ages 18-45 with newly diagnosed HR-positive early breast cancer. Confirmed premenopausal by FSH and estradiol levels. Exclusion: Postmenopausal status. Prior ovarian suppression therapy.',
+    expected: 'UNLIKELY',
+  },
 ]
 
 const DEFAULT_PROMPT = `You are evaluating clinical trial fit.
