@@ -28,14 +28,14 @@ describe('NaturalLanguageInput — WebGPU unavailable', () => {
   it('shows Unavailable badge', () => {
     useNLP.mockReturnValue({ ...baseHook, webGPUSupported: false })
     render(<NaturalLanguageInput onExtract={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /describe your situation/i }))
+    fireEvent.click(screen.getByRole('button', { name: /describe in your own words/i }))
     expect(screen.getByText('Unavailable')).toBeInTheDocument()
   })
 
   it('shows browser requirement message', () => {
     useNLP.mockReturnValue({ ...baseHook, webGPUSupported: false })
     render(<NaturalLanguageInput onExtract={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /describe your situation/i }))
+    fireEvent.click(screen.getByRole('button', { name: /describe in your own words/i }))
     expect(screen.getByText(/WebGPU-capable browser/i)).toBeInTheDocument()
   })
 })
@@ -44,7 +44,7 @@ describe('NaturalLanguageInput — consent screen', () => {
   it('shows consent screen when no prior consent and WebGPU available', () => {
     useNLP.mockReturnValue({ ...baseHook, status: 'idle' })
     render(<NaturalLanguageInput onExtract={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /describe your situation/i }))
+    fireEvent.click(screen.getByRole('button', { name: /describe in your own words/i }))
     expect(screen.getByText(/One-time setup/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Download & enable/i })).toBeInTheDocument()
   })
@@ -53,7 +53,7 @@ describe('NaturalLanguageInput — consent screen', () => {
     const load = vi.fn()
     useNLP.mockReturnValue({ ...baseHook, load })
     render(<NaturalLanguageInput onExtract={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /describe your situation/i }))
+    fireEvent.click(screen.getByRole('button', { name: /describe in your own words/i }))
     fireEvent.click(screen.getByRole('button', { name: /Download & enable/i }))
     expect(load).toHaveBeenCalled()
     expect(localStorage.getItem('iris_nlp_enabled')).toBe('true')
@@ -62,7 +62,7 @@ describe('NaturalLanguageInput — consent screen', () => {
   it('collapses panel when user clicks Not now', () => {
     useNLP.mockReturnValue({ ...baseHook, status: 'idle' })
     render(<NaturalLanguageInput onExtract={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /describe your situation/i }))
+    fireEvent.click(screen.getByRole('button', { name: /describe in your own words/i }))
     fireEvent.click(screen.getByRole('button', { name: /Not now/i }))
     expect(screen.queryByText(/One-time setup/i)).not.toBeInTheDocument()
   })
@@ -77,7 +77,7 @@ describe('NaturalLanguageInput — downloading state', () => {
     })
     localStorage.setItem('iris_nlp_enabled', 'true')
     render(<NaturalLanguageInput onExtract={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /describe your situation/i }))
+    fireEvent.click(screen.getByRole('button', { name: /describe in your own words/i }))
     expect(screen.getByText(/Fetching model/i)).toBeInTheDocument()
   })
 })
@@ -87,7 +87,7 @@ describe('NaturalLanguageInput — ready state', () => {
     useNLP.mockReturnValue({ ...baseHook, status: 'ready' })
     localStorage.setItem('iris_nlp_enabled', 'true')
     render(<NaturalLanguageInput onExtract={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /describe your situation/i }))
+    fireEvent.click(screen.getByRole('button', { name: /describe in your own words/i }))
     expect(screen.getByRole('textbox', { name: /natural language search/i })).not.toBeDisabled()
   })
 
@@ -99,7 +99,7 @@ describe('NaturalLanguageInput — ready state', () => {
     localStorage.setItem('iris_nlp_enabled', 'true')
 
     render(<NaturalLanguageInput onExtract={onExtract} />)
-    fireEvent.click(screen.getByRole('button', { name: /describe your situation/i }))
+    fireEvent.click(screen.getByRole('button', { name: /describe in your own words/i }))
     await user.type(screen.getByRole('textbox', { name: /natural language search/i }), '52yo woman with breast cancer')
     fireEvent.click(screen.getByRole('button', { name: /Find trials/i }))
 
@@ -122,13 +122,13 @@ describe('NaturalLanguageInput — confirmation card', () => {
     localStorage.setItem('iris_nlp_enabled', 'true')
 
     render(<NaturalLanguageInput onExtract={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /describe your situation/i }))
+    fireEvent.click(screen.getByRole('button', { name: /describe in your own words/i }))
     fireEvent.change(screen.getByRole('textbox', { name: /natural language search/i }), {
       target: { value: '52yo woman with breast cancer in Brooklyn' },
     })
     fireEvent.click(screen.getByRole('button', { name: /Find trials/i }))
 
-    await screen.findByText(/Here's what I understood/i)
+    await screen.findByText(/understood:/i)
     expect(screen.getByText('breast cancer')).toBeInTheDocument()
     expect(screen.getByText('Brooklyn')).toBeInTheDocument()
   })
@@ -139,13 +139,13 @@ describe('NaturalLanguageInput — confirmation card', () => {
     localStorage.setItem('iris_nlp_enabled', 'true')
 
     render(<NaturalLanguageInput onExtract={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /describe your situation/i }))
+    fireEvent.click(screen.getByRole('button', { name: /describe in your own words/i }))
     fireEvent.change(screen.getByRole('textbox', { name: /natural language search/i }), {
       target: { value: 'something unclear' },
     })
     fireEvent.click(screen.getByRole('button', { name: /Find trials/i }))
 
-    await screen.findByText(/couldn't determine the condition/i)
+    await screen.findByText(/couldn't determine condition/i)
   })
 })
 
@@ -154,7 +154,7 @@ describe('NaturalLanguageInput — error state', () => {
     useNLP.mockReturnValue({ ...baseHook, status: 'error', error: 'load failed' })
     localStorage.setItem('iris_nlp_enabled', 'true')
     render(<NaturalLanguageInput onExtract={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /describe your situation/i }))
+    fireEvent.click(screen.getByRole('button', { name: /describe in your own words/i }))
     expect(screen.getByText(/try again/i)).toBeInTheDocument()
   })
 })
