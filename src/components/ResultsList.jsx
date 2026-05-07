@@ -399,6 +399,7 @@ export default function ResultsList({
           count={compareSet.size}
           staleCount={staleCompareCount}
           onClear={onClearCompare}
+          onCompare={() => { window.location.hash = '/compare' }}
         />
       )}
 
@@ -470,7 +471,7 @@ function ResultsToolbar({ totalCount, searchParams, classifyProgress }) {
   )
 }
 
-function CompareBar({ count, staleCount = 0, onClear }) {
+function CompareBar({ count, staleCount = 0, onClear, onCompare }) {
   return (
     <div
       className="border-t border-parchment-200 bg-white px-4 py-2.5 flex items-center justify-between gap-3 shrink-0"
@@ -499,9 +500,8 @@ function CompareBar({ count, staleCount = 0, onClear }) {
         </button>
         <button
           type="button"
-          disabled
-          title="Compare view coming soon"
-          className="bg-iris-600 text-white px-4 py-1.5 rounded-md text-[13px] font-semibold opacity-60 cursor-not-allowed"
+          onClick={onCompare}
+          className="bg-iris-600 text-white px-4 py-1.5 rounded-md text-[13px] font-semibold hover:bg-iris-700"
         >
           Compare →
         </button>

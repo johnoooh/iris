@@ -3,8 +3,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import Header from './components/Header'
 import UnifiedSearchBar from './components/UnifiedSearchBar'
 import ResultsList from './components/ResultsList'
+import CompareView from './components/CompareView'
 import Footer from './components/Footer'
 import { resolveModelKey } from './utils/nlpModels'
+import { useHashRoute } from './hooks/useHashRoute'
 
 const COMPARE_LIMIT = 3
 
@@ -81,6 +83,18 @@ function IrisApp() {
     })
     pinnedTrialsRef.current.delete(nctId)
   }, [])
+
+  const { route, navigate } = useHashRoute()
+  if (route === '/compare') {
+    return (
+      <CompareView
+        compareSet={compareSet}
+        pinnedTrials={pinnedTrialsRef.current}
+        onBack={() => navigate('/')}
+        onRemove={removeFromCompare}
+      />
+    )
+  }
 
   const testRoute = getTestRoute()
   if (testRoute === 'nlp' && NLPTestPanel) {
